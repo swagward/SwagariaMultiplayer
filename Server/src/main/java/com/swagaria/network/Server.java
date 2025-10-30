@@ -1,40 +1,87 @@
 package com.swagaria.network;
 
+import com.swagaria.game.Player;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.*;
 
-/**
- * the main server class | listens for incoming client connections
- * and assigns each one its own handler thread
- */
 public class Server {
     private final int port;
-    private boolean running;
-    private final ExecutorService clientPool;
+    private final ExecutorService pool = Executors.newCachedThreadPool();
+    private final AtomicInteger idCounter = new AtomicInteger(1);
+    private final Map<Integer, Player> players = new ConcurrentHashMap<>();
+    private final List<ClientHandler> handlers = new CopyOnWriteArrayList<>();
+    private volatile boolean running = true;
+
+    private final ScheduledExecutorService tickExecutor = Executors.newSingleThreadScheduledExecutor();
+    private long lastUpdateTime = System.nanoTime();
 
     public Server(int port) {
         this.port = port;
-        this.clientPool = Executors.newFixedThreadPool(2); //maximum amount of clients able to join
     }
 
-    //listens for new clients connecting
     public void start() throws IOException {
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            running = true;
-            System.out.println("[Server] Listening for players on port " + port);
+        try (ServerSocket ss = new ServerSocket(port)) {
+            System.out.println("[Server] Listening on port " + port);
+
+            // Start game loop (tick at 60Hz)
+            tickExecutor.scheduleAtFixedRate(this::gameTick, 0, 16, TimeUnit.MILLISECONDS);
 
             while (running) {
-                Socket clientSocket = serverSocket.accept();
-                String clientAddress = clientSocket.getInetAddress().getHostAddress();
+                Socket sock = ss.accept();
+                int id = idCounter.getAndIncrement();
 
-                System.out.println("[Server] Player joined from " + clientAddress);
+                float spawnX = 100 + (id - 1) * 60;
+                float spawnY = 200;
+                Player p = new Player(id, spawnX, spawnY);
+                players.put(id, p);
 
-                //assign a handler thread to the client
-                clientPool.submit(new ClientHandler(clientSocket));
+                ClientHandler h = new ClientHandler(sock, id, this);
+                handlers.add(h);
+                pool.submit(h);
+
+                System.out.println("[Server] Player #" + id + " connected.");
             }
         }
+    }
+
+    /** Called 60 times per second */
+    private void gameTick() {
+        long now = System.nanoTime();
+        float deltaTime = (now - lastUpdateTime) / 1_000_000_000f;
+        lastUpdateTime = now;
+
+        for (Player p : players.values()) {
+            p.update(deltaTime);
+            if (p.hasMoved()) {
+                broadcast("PLAYER_MOVE," + p.getId() + "," + p.getX() + "," + p.getY());
+                p.syncPosition();
+            }
+        }
+    }
+
+    public Collection<Player> getAllPlayers() { return players.values(); }
+    public Player getPlayer(int id) { return players.get(id); }
+
+    public void broadcast(String msg) {
+        for (ClientHandler ch : handlers) {
+            ch.sendMessage(msg);
+        }
+    }
+
+    public void broadcastExcept(String msg, int excludeId) {
+        for (ClientHandler ch : handlers) {
+            if (ch.getClientId() != excludeId) ch.sendMessage(msg);
+        }
+    }
+
+    public void removeClient(int id, ClientHandler handler) {
+        players.remove(id);
+        handlers.remove(handler);
+        broadcast("PLAYER_LEAVE," + id);
+        System.out.println("[Server] Player #" + id + " removed.");
     }
 }

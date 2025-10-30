@@ -1,82 +1,107 @@
-#include "../include/Network.h"
+#include "../include/network.h"
+#include "../include/Game.h"
 #include <iostream>
+#include <sstream>
+#include <algorithm>
 
-bool Network::init() {
-    if (SDLNet_Init() < 0) {
-        std::cerr << "[Network] Failed to initialize SDL_net: "
-                  << SDLNet_GetError() << std::endl;
-        return false;
-    }
-    std::cout << "[Network] SDL_net initialized successfully.\n";
-    return true;
+Network::Network() {
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
 }
 
-bool Network::connectToServer(const std::string& host, Uint16 port) {
-    IPaddress ip;
-    if (SDLNet_ResolveHost(&ip, host.c_str(), port) < 0) {
-        std::cerr << "[Network] Failed to resolve host '" << host << "': "
-                  << SDLNet_GetError() << std::endl;
+Network::~Network() {
+    disconnect();
+    WSACleanup();
+}
+
+bool Network::connectToServer(const std::string& host, int port) {
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(port);
+    inet_pton(AF_INET, host.c_str(), &serverAddr.sin_addr);
+
+    socket = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (socket == INVALID_SOCKET) {
+        std::cerr << "[Network] Socket creation failed.\n";
         return false;
     }
 
-    socket = SDLNet_TCP_Open(&ip);
-    if (!socket) {
-        std::cerr << "[Network] Could not open TCP connection: "
-                  << SDLNet_GetError() << std::endl;
+    if (::connect(socket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        std::cerr << "[Network] Failed to connect to " << host << ":" << port << "\n";
+        closesocket(socket);
         return false;
     }
 
-    //create a socket (set for polling the incoming data to stop blocking the network)
-    socketSet = SDLNet_AllocSocketSet(1);
-    SDLNet_TCP_AddSocket(socketSet, socket);
-
+    connected = true;
     std::cout << "[Network] Connected to " << host << ":" << port << std::endl;
+
+    recvThread = std::thread(&Network::receiveLoop, this);
+    sendThread = std::thread(&Network::sendLoop, this);
+
     return true;
 }
 
-void Network::sendMessage(const std::string& msg) {
-    if (!socket) return;
-    std::string formatted = msg + "\n";
-    int len = formatted.size();
-    if (SDLNet_TCP_Send(socket, formatted.c_str(), len) < len) {
-        std::cerr << "[Network] Failed to send message: " << SDLNet_GetError() << std::endl;
+void Network::disconnect() {
+    connected = false;
+
+    if (socket != INVALID_SOCKET) {
+        shutdown(socket, SD_BOTH);
+        closesocket(socket);
+        socket = INVALID_SOCKET;
+    }
+
+    if (recvThread.joinable()) recvThread.join();
+    if (sendThread.joinable()) sendThread.join();
+}
+
+void Network::queueMessage(const std::string& msg) {
+    std::lock_guard<std::mutex> lock(sendMutex);
+    sendQueue.push(msg);
+}
+
+void Network::receiveLoop() {
+    char buffer[1024];
+    while (connected) {
+        int bytes = recv(socket, buffer, sizeof(buffer) - 1, 0);
+        if (bytes <= 0) {
+            connected = false;
+            break;
+        }
+        buffer[bytes] = '\0';
+        std::string msg(buffer);
+
+        std::istringstream iss(msg);
+        std::string line;
+        while (std::getline(iss, line)) {
+            line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
+            line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+            if (!line.empty()) {
+                std::cout << "[Client] Received: " << line << std::endl;
+                if (game) {
+                    game->pushNetworkMessage(line);
+                }
+            }
+        }
     }
 }
 
-void Network::receiveMessage() {
-    if (!socket || !socketSet) return;
-
-    //poll the socket set for up to a millisecond
-    const int activity = SDLNet_CheckSockets(socketSet, 1);
-    if (activity <= 0) return; // nothing to read
-
-    if (SDLNet_SocketReady(socket)) {
-        char buffer[512];
-        const int received = SDLNet_TCP_Recv(socket, buffer, sizeof(buffer) - 1);
-
-        if (received <= 0) {
-            std::cerr << "[Network] Connection closed or receive error.\n";
-            SDLNet_TCP_DelSocket(socketSet, socket);
-            SDLNet_TCP_Close(socket);
-            socket = nullptr;
-            return;
+void Network::sendLoop() {
+    while (connected) {
+        std::string msg;
+        {
+            std::lock_guard<std::mutex> lock(sendMutex);
+            if (!sendQueue.empty()) {
+                msg = sendQueue.front();
+                sendQueue.pop();
+            }
         }
 
-        buffer[received] = '\0';
-        std::cout << "[Server] " << buffer << std::endl;
-    }
-}
+        if (!msg.empty()) {
+            if (msg.back() != '\n') msg.push_back('\n');
+            std::cout << "[Network] Sending: " << msg;
+            send(socket, msg.c_str(), (int)msg.size(), 0);
+        }
 
-void Network::cleanup() {
-    if (socketSet) {
-        SDLNet_FreeSocketSet(socketSet);
-        socketSet = nullptr;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    if (socket) {
-        SDLNet_TCP_Close(socket);
-        socket = nullptr;
-    }
-
-    SDLNet_Quit();
-    std::cout << "[Network] Cleaned up SDL_net.\n";
 }
