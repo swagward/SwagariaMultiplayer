@@ -17,7 +17,6 @@ Game::Game() {
     }
 }
 
-
 void Game::pushNetworkMessage(const std::string& msg) {
     std::lock_guard<std::mutex> lock(incomingMutex);
     incomingMessages.push(msg);
@@ -37,13 +36,11 @@ void Game::handleOneNetworkMessage(const std::string& msg) {
     std::string token;
     std::vector<std::string> parts;
 
-    // Split the message by commas
     while (std::getline(ss, token, ',')) {
         parts.push_back(token);
     }
 
     if (parts.empty()) return;
-
     const std::string& cmd = parts[0];
 
     if (cmd == "ASSIGN_ID") {
@@ -54,8 +51,9 @@ void Game::handleOneNetworkMessage(const std::string& msg) {
         int id = std::stoi(parts[1]);
         float x = std::stof(parts[2]);
         float y = std::stof(parts[3]);
-        players[id] = {id, x, y, id == localPlayerId, "Player" + std::to_string(localPlayerId)};
-        std::cout << "[Client] Spawned " << (id == localPlayerId ? "local" : "remote") << " player (" << id << ") at " << x << "," << y << std::endl;
+        std::string name = (parts.size() >= 5 ? parts[4] : "Player" + std::to_string(id));
+        players[id] = {id, x, y, id == localPlayerId, name};
+        std::cout << "[Client] Spawned player #" << id << " at " << x << "," << y << std::endl;
     }
     else if (cmd == "PLAYER_MOVE") {
         int id = std::stoi(parts[1]);
@@ -70,8 +68,9 @@ void Game::handleOneNetworkMessage(const std::string& msg) {
         int id = std::stoi(parts[1]);
         float x = std::stof(parts[2]);
         float y = std::stof(parts[3]);
-        players[id] = {id, x, y, false};
-        std::cout << "[Client] Player " << id << " joined." << std::endl;
+        std::string name = (parts.size() >= 5 ? parts[4] : "Player" + std::to_string(id));
+        players[id] = {id, x, y, false, name};
+        std::cout << "[Client] Player " << id << " joined (" << name << ")." << std::endl;
     }
     else if (cmd == "PLAYER_LEAVE") {
         int id = std::stoi(parts[1]);
@@ -89,7 +88,7 @@ void Game::handleOneNetworkMessage(const std::string& msg) {
 }
 
 void Game::handleInput(const SDL_Event& e) {
-    if (localPlayerId == -1) return; //player ID not assigned yet so return
+    if (localPlayerId == -1) return;
 
     std::string action;
     switch (e.key.keysym.sym) {
@@ -100,48 +99,34 @@ void Game::handleInput(const SDL_Event& e) {
         default: return;
     }
 
-    //message format: INPUT,<id>,<action>
     std::ostringstream oss;
     oss << "INPUT," << localPlayerId << "," << action;
-    if (network) {
-        network->queueMessage(oss.str());
-    }
+    if (network) network->queueMessage(oss.str());
 }
 
-void Game::handleConsoleCommand(const std::string& input) {
-    if (input.rfind("/setname", 0) == 0) {
-        std::string newName = input.substr(9); // skip "/setname "
-        if (!newName.empty() && network) {
-            std::ostringstream oss;
-            oss << "SETNAME," << localPlayerId << "," << newName;
-            network->queueMessage(oss.str());
-        }
-    }
-}
 void Game::update() {
-    //possibly add client-side prediction??
+    // No client-side prediction for now
 }
 
 void Game::render(SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 30, 160, 230, 255);
     SDL_RenderClear(renderer);
 
-    // Draw floor (temporary test world)
-    SDL_SetRenderDrawColor(renderer, 100, 60, 30, 255); // brownish floor
+    SDL_SetRenderDrawColor(renderer, 100, 60, 30, 255);
     SDL_Rect floorRect{0, 332, 800, 68};
     SDL_RenderFillRect(renderer, &floorRect);
-
 
     for (auto& [id, p] : players) {
         SDL_Rect rect{ static_cast<int>(p.x), static_cast<int>(p.y), 32, 32 };
         if (p.isLocal)
-            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); //green for local client
+            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
         else
-            SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255); //yellow for other players
+            SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
         SDL_RenderFillRect(renderer, &rect);
 
         if (!p.name.empty()) {
-            drawText(renderer, p.name, p.x - 10, p.y - 25, p.isLocal ? SDL_Color{0,255,0,255} : SDL_Color{255,255,0,255});
+            drawText(renderer, p.name, p.x - 10, p.y - 25,
+                p.isLocal ? SDL_Color{0,255,0,255} : SDL_Color{255,255,0,255});
         }
     }
 
@@ -150,13 +135,10 @@ void Game::render(SDL_Renderer* renderer) {
 
 void Game::drawText(SDL_Renderer* renderer, const std::string& text, int x, int y, SDL_Color color) {
     if (!font) return;
-
     SDL_Surface* surface = TTF_RenderText_Solid(font, text.c_str(), color);
     if (!surface) return;
-
     SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_Rect dstRect = { x, y, surface->w, surface->h };
-
     SDL_FreeSurface(surface);
     SDL_RenderCopy(renderer, texture, nullptr, &dstRect);
     SDL_DestroyTexture(texture);

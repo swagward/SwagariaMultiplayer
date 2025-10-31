@@ -1,4 +1,3 @@
-// ClientHandler.java
 package com.swagaria.network;
 
 import com.swagaria.game.Player;
@@ -48,9 +47,17 @@ public class ClientHandler implements Runnable {
                 out.flush();
             }
 
-            // --- Let everyone else know this player joined ---
+            String worldData = server.getWorld().serialize();
+            out.println(worldData);
+            out.flush();
+            System.out.println("[Server] Sent world data to player #" + clientId);
+
+            // --- Notify others that this player joined ---
             if (me != null) {
-                server.broadcastExcept("PLAYER_JOIN," + clientId + "," + me.getX() + "," + me.getY() + "," + me.getName(), clientId);
+                server.broadcastExcept(
+                        "PLAYER_JOIN," + clientId + "," + me.getX() + "," + me.getY() + "," + me.getName(),
+                        clientId
+                );
             }
 
             // --- Main receive loop ---
@@ -70,14 +77,13 @@ public class ClientHandler implements Runnable {
     private void handleLine(String line) {
         if (line == null || line.isEmpty()) return;
 
-        String[] parts = line.split(",", 3); // Allow names with commas
+        String[] parts = line.split(",", 3);
         if (parts.length == 0) return;
 
         String cmd = parts[0];
 
         switch (cmd) {
             case "INPUT" -> handleInput(parts);
-            case "SETNAME" -> handleSetName(parts);
             default -> System.out.println("[Server] Unknown command: " + cmd);
         }
     }
@@ -92,23 +98,6 @@ public class ClientHandler implements Runnable {
 
         boolean pressed = action.endsWith("_DOWN");
         p.setInput(action, pressed);
-    }
-
-    private void handleSetName(String[] parts) {
-        if (parts.length < 3) return;
-        int id = Integer.parseInt(parts[1]);
-        String newName = parts[2];
-
-        Player p = server.getPlayer(id);
-        if (p == null) return;
-
-        // Update server-side name
-        p.setName(newName);
-        System.out.println("[Server] Player #" + id + " set name to " + newName);
-
-        // Broadcast to all clients
-        String msg = "PLAYER_NAME," + id + "," + newName;
-        server.broadcast(msg);
     }
 
     public void sendMessage(String msg) {

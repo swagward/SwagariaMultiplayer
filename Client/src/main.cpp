@@ -21,6 +21,9 @@ int main(int argc, char* argv[]) {
 
     if (!network.connectToServer("127.0.0.1", 25565)) {
         std::cerr << "Failed to connect to server" << std::endl;
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
         return -1;
     }
 
@@ -29,7 +32,8 @@ int main(int argc, char* argv[]) {
 
     while (isRunning) {
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) isRunning = false;
+            if (event.type == SDL_QUIT)
+                isRunning = false;
             if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && event.key.repeat == 0)
                 game.handleInput(event);
         }
@@ -37,7 +41,7 @@ int main(int argc, char* argv[]) {
         game.processNetworkMessages();
         game.update();
         game.render(renderer);
-        SDL_Delay(16);
+        SDL_Delay(16); // ~60 FPS
     }
 
     network.disconnect();
