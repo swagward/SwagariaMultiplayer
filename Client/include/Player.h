@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 
 struct Player {
     int id;

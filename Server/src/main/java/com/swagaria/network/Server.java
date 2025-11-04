@@ -1,7 +1,6 @@
 package com.swagaria.network;
 
 import com.swagaria.game.Player;
-import com.swagaria.game.World;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -19,7 +18,6 @@ public class Server {
 
     private final ScheduledExecutorService tickExecutor = Executors.newSingleThreadScheduledExecutor();
     private long lastUpdateTime = System.nanoTime();
-    private final World world = new World(100, 60);
 
     public Server(int port) {
         this.port = port;
@@ -50,6 +48,7 @@ public class Server {
         }
     }
 
+    /** Called 60 times per second */
     private void gameTick() {
         long now = System.nanoTime();
         float deltaTime = (now - lastUpdateTime) / 1_000_000_000f;
@@ -66,7 +65,6 @@ public class Server {
 
     public Collection<Player> getAllPlayers() { return players.values(); }
     public Player getPlayer(int id) { return players.get(id); }
-    public World getWorld() { return world; }
 
     public void broadcast(String msg) {
         for (ClientHandler ch : handlers) {

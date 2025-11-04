@@ -1,4 +1,4 @@
 package com.swagaria.game;
 
-public class World {
+public class Chunk {
 }
