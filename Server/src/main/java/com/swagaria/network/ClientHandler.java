@@ -1,4 +1,3 @@
-// ClientHandler.java
 package com.swagaria.network;
 
 import com.swagaria.game.Player;
@@ -29,31 +28,37 @@ public class ClientHandler implements Runnable {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(socket.getOutputStream(), true);
 
-            // --- Assign ID to client ---
+            // assign ID
             out.println("ASSIGN_ID," + clientId);
             out.flush();
 
-            // --- Send all existing players to the new client ---
+            // send all existing players
             for (Player p : server.getAllPlayers()) {
                 if (p.getId() != clientId) {
-                    out.println("PLAYER_JOIN," + p.getId() + "," + p.getX() + "," + p.getY() + "," + p.getName());
+                    out.println("PLAYER_JOIN," + p.getId() + "," + p.getX() + "," + p.getY());
                     out.flush();
                 }
             }
 
-            // --- Spawn this client’s own player ---
+            // spawn local player
             Player me = server.getPlayer(clientId);
             if (me != null) {
-                out.println("SPAWN," + clientId + "," + me.getX() + "," + me.getY() + "," + me.getName());
+                out.println("SPAWN," + clientId + "," + me.getX() + "," + me.getY());
                 out.flush();
             }
 
-            // --- Let everyone else know this player joined ---
+            for (var chunk : server.getWorld().getAllChunks()) {
+                out.println(chunk.serialize());
+                out.flush();
+            }
+            System.out.println("[Server] Sent " + server.getWorld().getAllChunks().size() + " chunks to player #" + clientId);
+
+            // notify others
             if (me != null) {
-                server.broadcastExcept("PLAYER_JOIN," + clientId + "," + me.getX() + "," + me.getY() + "," + me.getName(), clientId);
+                server.broadcastExcept("PLAYER_JOIN," + clientId + "," + me.getX() + "," + me.getY(), clientId);
             }
 
-            // --- Main receive loop ---
+            // listen
             String line;
             while (running && (line = in.readLine()) != null) {
                 handleLine(line);
@@ -70,14 +75,12 @@ public class ClientHandler implements Runnable {
     private void handleLine(String line) {
         if (line == null || line.isEmpty()) return;
 
-        String[] parts = line.split(",", 3); // Allow names with commas
+        String[] parts = line.split(",", 3);
         if (parts.length == 0) return;
 
         String cmd = parts[0];
-
         switch (cmd) {
             case "INPUT" -> handleInput(parts);
-            case "SETNAME" -> handleSetName(parts);
             default -> System.out.println("[Server] Unknown command: " + cmd);
         }
     }
@@ -92,23 +95,6 @@ public class ClientHandler implements Runnable {
 
         boolean pressed = action.endsWith("_DOWN");
         p.setInput(action, pressed);
-    }
-
-    private void handleSetName(String[] parts) {
-        if (parts.length < 3) return;
-        int id = Integer.parseInt(parts[1]);
-        String newName = parts[2];
-
-        Player p = server.getPlayer(id);
-        if (p == null) return;
-
-        // Update server-side name
-        p.setName(newName);
-        System.out.println("[Server] Player #" + id + " set name to " + newName);
-
-        // Broadcast to all clients
-        String msg = "PLAYER_NAME," + id + "," + newName;
-        server.broadcast(msg);
     }
 
     public void sendMessage(String msg) {

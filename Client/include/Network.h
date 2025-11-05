@@ -1,17 +1,12 @@
 #pragma once
-#include <string>
 #include <thread>
 #include <atomic>
 #include <mutex>
 #include <queue>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <iostream>
-#include "Player.h"
-
-#pragma comment(lib, "ws2_32.lib")
+#include <SDL_net.h>
 
 class Game;
+class World;
 
 class Network {
 public:
@@ -24,9 +19,10 @@ public:
     bool isConnected() const { return connected; }
 
     void setGame(Game* g) { game = g; }
+    void setWorld(World* w) { world = w; }
 
 private:
-    SOCKET socket = INVALID_SOCKET;
+    TCPsocket socket = nullptr;
     std::thread recvThread;
     std::thread sendThread;
     std::atomic<bool> connected{false};
@@ -34,6 +30,7 @@ private:
     std::mutex sendMutex;
 
     Game* game = nullptr;
+    World* world = nullptr;
 
     void receiveLoop();
     void sendLoop();

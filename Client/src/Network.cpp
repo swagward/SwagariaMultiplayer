@@ -1,53 +1,48 @@
-#include "../include/network.h"
+#include "../include/Network.h"
 #include "../include/Game.h"
-#include <iostream>
-#include <sstream>
 #include <algorithm>
 
 Network::Network() {
-    WSADATA wsaData;
-    WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (SDLNet_Init() < 0) {
+        std::cerr << "[sdl_net] failed to initialize: " << SDLNet_GetError() << std::endl;
+    } else {
+        std::cout << "[sdl_net] initialized successfully\n";
+    }
 }
 
 Network::~Network() {
     disconnect();
-    WSACleanup();
+    SDLNet_Quit();
 }
 
 bool Network::connectToServer(const std::string& host, int port) {
-    sockaddr_in serverAddr{};
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(port);
-    inet_pton(AF_INET, host.c_str(), &serverAddr.sin_addr);
-
-    socket = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (socket == INVALID_SOCKET) {
-        std::cerr << "[Network] Socket creation failed.\n";
+    IPaddress ip;
+    if (SDLNet_ResolveHost(&ip, host.c_str(), port) < 0) {
+        std::cerr << "[network] failed to resolve host: " << SDLNet_GetError() << std::endl;
         return false;
     }
 
-    if (::connect(socket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        std::cerr << "[Network] Failed to connect to " << host << ":" << port << "\n";
-        closesocket(socket);
+    socket = SDLNet_TCP_Open(&ip);
+    if (!socket) {
+        std::cerr << "[network] failed to connect to " << host << ":" << port
+                  << " - " << SDLNet_GetError() << std::endl;
         return false;
     }
 
     connected = true;
-    std::cout << "[Network] Connected to " << host << ":" << port << std::endl;
+    std::cout << "[network] connected to " << host << ":" << port << std::endl;
 
     recvThread = std::thread(&Network::receiveLoop, this);
     sendThread = std::thread(&Network::sendLoop, this);
-
     return true;
 }
 
 void Network::disconnect() {
     connected = false;
 
-    if (socket != INVALID_SOCKET) {
-        shutdown(socket, SD_BOTH);
-        closesocket(socket);
-        socket = INVALID_SOCKET;
+    if (socket) {
+        SDLNet_TCP_Close(socket);
+        socket = nullptr;
     }
 
     if (recvThread.joinable()) recvThread.join();
@@ -55,31 +50,34 @@ void Network::disconnect() {
 }
 
 void Network::queueMessage(const std::string& msg) {
-    std::lock_guard<std::mutex> lock(sendMutex);
+    std::lock_guard lock(sendMutex);
     sendQueue.push(msg);
 }
 
 void Network::receiveLoop() {
-    char buffer[1024];
+    char buffer[4096];
+    std::string partial;
+
     while (connected) {
-        int bytes = recv(socket, buffer, sizeof(buffer) - 1, 0);
+        int bytes = SDLNet_TCP_Recv(socket, buffer, sizeof(buffer) - 1);
         if (bytes <= 0) {
+            std::cerr << "[network] connection lost or closed\n";
             connected = false;
             break;
         }
-        buffer[bytes] = '\0';
-        std::string msg(buffer);
 
-        std::istringstream iss(msg);
-        std::string line;
-        while (std::getline(iss, line)) {
+        buffer[bytes] = '\0';
+        partial += buffer;
+
+        size_t pos;
+        while ((pos = partial.find('\n')) != std::string::npos) {
+            std::string line = partial.substr(0, pos);
+            partial.erase(0, pos + 1);
+
             line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
             line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
-            if (!line.empty()) {
-                std::cout << "[Client] Received: " << line << std::endl;
-                if (game) {
-                    game->pushNetworkMessage(line);
-                }
+            if (!line.empty() && game) {
+                game->pushNetworkMessage(line);
             }
         }
     }
@@ -89,7 +87,7 @@ void Network::sendLoop() {
     while (connected) {
         std::string msg;
         {
-            std::lock_guard<std::mutex> lock(sendMutex);
+            std::lock_guard lock(sendMutex);
             if (!sendQueue.empty()) {
                 msg = sendQueue.front();
                 sendQueue.pop();
@@ -98,8 +96,13 @@ void Network::sendLoop() {
 
         if (!msg.empty()) {
             if (msg.back() != '\n') msg.push_back('\n');
-            std::cout << "[Network] Sending: " << msg;
-            send(socket, msg.c_str(), (int)msg.size(), 0);
+            int len = static_cast<int>(msg.size());
+            int result = SDLNet_TCP_Send(socket, msg.c_str(), len);
+
+            if (result < len) {
+                std::cerr << "[network] send failed: " << SDLNet_GetError() << std::endl;
+                connected = false;
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(10));

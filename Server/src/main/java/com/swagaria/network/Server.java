@@ -1,6 +1,8 @@
 package com.swagaria.network;
 
 import com.swagaria.game.Player;
+import com.swagaria.game.World;
+import com.swagaria.game.Chunk;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -14,6 +16,7 @@ public class Server {
     private final AtomicInteger idCounter = new AtomicInteger(1);
     private final Map<Integer, Player> players = new ConcurrentHashMap<>();
     private final List<ClientHandler> handlers = new CopyOnWriteArrayList<>();
+    private final World world = new World();
     private volatile boolean running = true;
 
     private final ScheduledExecutorService tickExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -27,7 +30,6 @@ public class Server {
         try (ServerSocket ss = new ServerSocket(port)) {
             System.out.println("[Server] Listening on port " + port);
 
-            // Start game loop (tick at 60Hz)
             tickExecutor.scheduleAtFixedRate(this::gameTick, 0, 16, TimeUnit.MILLISECONDS);
 
             while (running) {
@@ -48,19 +50,8 @@ public class Server {
         }
     }
 
-    /** Called 60 times per second */
-    private void gameTick() {
-        long now = System.nanoTime();
-        float deltaTime = (now - lastUpdateTime) / 1_000_000_000f;
-        lastUpdateTime = now;
-
-        for (Player p : players.values()) {
-            p.update(deltaTime);
-            if (p.hasMoved()) {
-                broadcast("PLAYER_MOVE," + p.getId() + "," + p.getX() + "," + p.getY());
-                p.syncPosition();
-            }
-        }
+    public World getWorld() {
+        return world;
     }
 
     public Collection<Player> getAllPlayers() { return players.values(); }
@@ -83,5 +74,19 @@ public class Server {
         handlers.remove(handler);
         broadcast("PLAYER_LEAVE," + id);
         System.out.println("[Server] Player #" + id + " removed.");
+    }
+
+    private void gameTick() {
+        long now = System.nanoTime();
+        float deltaTime = (now - lastUpdateTime) / 1_000_000_000f;
+        lastUpdateTime = now;
+
+        for (Player p : players.values()) {
+            p.update(deltaTime);
+            if (p.hasMoved()) {
+                broadcast("PLAYER_MOVE," + p.getId() + "," + p.getX() + "," + p.getY());
+                p.syncPosition();
+            }
+        }
     }
 }

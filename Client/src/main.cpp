@@ -1,12 +1,9 @@
 #include "../include/Game.h"
 #include "../include/Network.h"
-#include <SDL.h>
-#include <iostream>
 
 int main(int argc, char* argv[]) {
-
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        std::cerr << "Failed to initialize SDL: " << SDL_GetError() << std::endl;
+        std::cerr << "failed to initialize sdl: " << SDL_GetError() << std::endl;
         return -1;
     }
 
@@ -20,24 +17,43 @@ int main(int argc, char* argv[]) {
     game.setNetwork(&network);
 
     if (!network.connectToServer("127.0.0.1", 25565)) {
-        std::cerr << "Failed to connect to server" << std::endl;
+        std::cerr << "failed to connect to server" << std::endl;
         return -1;
     }
 
     bool isRunning = true;
     SDL_Event event;
 
+    //fps tracking variables
+    Uint32 fpsLastTime = SDL_GetTicks();
+    Uint32 fpsFrames = 0;
+    float fps = 0.0f;
+
     while (isRunning) {
+        //handle input
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) isRunning = false;
             if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && event.key.repeat == 0)
                 game.handleInput(event);
         }
 
+        //game logic
         game.processNetworkMessages();
-        game.update();
         game.render(renderer);
-        SDL_Delay(16);
+
+        //fps counting
+        fpsFrames++;
+        Uint32 currentTime = SDL_GetTicks();
+        if (currentTime - fpsLastTime >= 500) { //update every 0.5s
+            fps = (fpsFrames * 1000.0f) / (currentTime - fpsLastTime);
+            fpsLastTime = currentTime;
+            fpsFrames = 0;
+
+            std::string title = "Swagaria - FPS: " + std::to_string(static_cast<int>(fps));
+            SDL_SetWindowTitle(window, title.c_str());
+        }
+
+        SDL_Delay(1); //reduce CPU usage without hurting FPS
     }
 
     network.disconnect();

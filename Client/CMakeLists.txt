@@ -30,5 +30,4 @@ target_link_libraries(client
         SDL2
         SDL2_net
         SDL2_ttf
-        Ws2_32
 )
