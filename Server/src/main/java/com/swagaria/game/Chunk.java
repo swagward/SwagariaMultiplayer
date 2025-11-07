@@ -29,19 +29,18 @@ public class Chunk {
         for (int x = 0; x < SIZE; x++) {
             int worldX = chunkX * SIZE + x;
 
-            //smooth surface height
+            //get the surface Y value
             double heightValue = heightNoise.eval(worldX * heightFrequency, 0.0);
             heightValue = (heightValue + 1.0) * 0.5;
             int surfaceY = (int) (heightValue * (worldHeight * 0.5));
 
-            // iterate world Y bottom-to-top
             for (int y = 0; y < SIZE; y++) {
                 int worldY = chunkY * SIZE + y;
 
-                // flip Y to make y=0 the bottom of this chunk array
+                //flip the Y so top = bottom and vice versa (stupid java 2D origin
                 int arrayY = SIZE - 1 - y;
 
-                //generate cave openings
+                //generate cave pockets
                 double caveVal = caveNoise.eval(worldX * caveFrequency, worldY * caveFrequency);
                 boolean isCave = caveVal > 0.4;
 

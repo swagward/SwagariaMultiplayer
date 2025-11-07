@@ -18,14 +18,13 @@ public:
     void setNetwork(Network* n) { network = n; }
     void pushNetworkMessage(const std::string& msg); //called from network thread
     void processNetworkMessages(); //called from main thread
-    void handleInput(const SDL_Event& e); //called from main thread
+    void handleInput(const SDL_Event& e) const; //called from main thread
     void render(SDL_Renderer* renderer);
 
     int getLocalPlayerId() const { return localPlayerId; }
-    void setLocalPlayerId(int id) { localPlayerId = id; }
-    void printChunkLayout();
+    void setLocalPlayerId(const int id) { localPlayerId = id; }
 
-    void drawText(SDL_Renderer* renderer, const std::string& text, int x, int y, SDL_Color color);
+    void drawText(SDL_Renderer* renderer, const std::string& text, int x, int y, SDL_Color color) const;
 
 private:
     Network* network = nullptr;

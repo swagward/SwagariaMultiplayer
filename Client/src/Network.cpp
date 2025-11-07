@@ -15,7 +15,7 @@ Network::~Network() {
     SDLNet_Quit();
 }
 
-bool Network::connectToServer(const std::string& host, int port) {
+bool Network::connectToServer(const std::string& host, const int port) {
     IPaddress ip;
     if (SDLNet_ResolveHost(&ip, host.c_str(), port) < 0) {
         std::cerr << "[network] failed to resolve host: " << SDLNet_GetError() << std::endl;
@@ -59,7 +59,7 @@ void Network::receiveLoop() {
     std::string partial;
 
     while (connected) {
-        int bytes = SDLNet_TCP_Recv(socket, buffer, sizeof(buffer) - 1);
+        const int bytes = SDLNet_TCP_Recv(socket, buffer, sizeof(buffer) - 1);
         if (bytes <= 0) {
             std::cerr << "[network] connection lost or closed\n";
             connected = false;
@@ -96,10 +96,9 @@ void Network::sendLoop() {
 
         if (!msg.empty()) {
             if (msg.back() != '\n') msg.push_back('\n');
-            int len = static_cast<int>(msg.size());
-            int result = SDLNet_TCP_Send(socket, msg.c_str(), len);
+            const int len = static_cast<int>(msg.size());
 
-            if (result < len) {
+            if (const int result = SDLNet_TCP_Send(socket, msg.c_str(), len); result < len) {
                 std::cerr << "[network] send failed: " << SDLNet_GetError() << std::endl;
                 connected = false;
             }

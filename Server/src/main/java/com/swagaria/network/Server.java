@@ -2,7 +2,6 @@ package com.swagaria.network;
 
 import com.swagaria.game.Player;
 import com.swagaria.game.World;
-import com.swagaria.game.Chunk;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -17,7 +16,7 @@ public class Server {
     private final Map<Integer, Player> players = new ConcurrentHashMap<>();
     private final List<ClientHandler> handlers = new CopyOnWriteArrayList<>();
     private final World world = new World();
-    private volatile boolean running = true;
+    private final boolean running = true;
 
     private final ScheduledExecutorService tickExecutor = Executors.newSingleThreadScheduledExecutor();
     private long lastUpdateTime = System.nanoTime();

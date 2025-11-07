@@ -43,8 +43,7 @@ int main(int argc, char* argv[]) {
 
         //fps counting
         fpsFrames++;
-        Uint32 currentTime = SDL_GetTicks();
-        if (currentTime - fpsLastTime >= 500) { //update every 0.5s
+        if (const Uint32 currentTime = SDL_GetTicks(); currentTime - fpsLastTime >= 500) { //update every 0.5s
             fps = (fpsFrames * 1000.0f) / (currentTime - fpsLastTime);
             fpsLastTime = currentTime;
             fpsFrames = 0;
@@ -53,7 +52,7 @@ int main(int argc, char* argv[]) {
             SDL_SetWindowTitle(window, title.c_str());
         }
 
-        SDL_Delay(1); //reduce CPU usage without hurting FPS
+        SDL_Delay(1);
     }
 
     network.disconnect();

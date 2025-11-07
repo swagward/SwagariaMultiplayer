@@ -16,7 +16,7 @@ public:
     bool connectToServer(const std::string& host, int port);
     void disconnect();
     void queueMessage(const std::string& msg);
-    bool isConnected() const { return connected; }
+    [[nodiscard]] bool isConnected() const { return connected; }
 
     void setGame(Game* g) { game = g; }
     void setWorld(World* w) { world = w; }

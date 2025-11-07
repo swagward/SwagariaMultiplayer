@@ -9,14 +9,14 @@ Game::Game() {
     if (TTF_Init() == -1) {
         std::cerr << "[sdl_ttf] failed to initialize: " << TTF_GetError() << std::endl;
     } else {
-        font = TTF_OpenFont("C:/Windows/Fonts/arial.ttf", 16);
+        font = TTF_OpenFont("C:/Windows/Fonts/arial.ttf", 16); //add font file inside of game so not pulling from windows dir (would break on linux/mac)
         if (!font)
             std::cerr << "[sdl_ttf] failed to load font: " << TTF_GetError() << std::endl;
         else
             std::cout << "[sdl_ttf] font loaded successfully.\n";
     }
 
-    // create world and camera with screen size
+    //create world and camera with screen size
     world = std::make_unique<World>();
     camera = std::make_unique<Camera>(800, 600);
 }
@@ -53,37 +53,36 @@ void Game::handleOneNetworkMessage(const std::string& msg) {
     }
 
     if (parts.empty()) return;
-    const std::string& cmd = parts[0];
 
-    if (cmd == "ASSIGN_ID") {
+    if (const std::string& cmd = parts[0]; cmd == "ASSIGN_ID") {
         localPlayerId = std::stoi(parts[1]);
         std::cout << "[client] assigned id " << localPlayerId << std::endl;
     }
     else if (cmd == "SPAWN") {
-        int id = std::stoi(parts[1]);
-        float x = std::stof(parts[2]);
-        float y = std::stof(parts[3]);
+        const int id = std::stoi(parts[1]);
+        const float x = std::stof(parts[2]);
+        const float y = std::stof(parts[3]);
         players[id] = { id, x, y, id == localPlayerId, "Player" + std::to_string(id) };
         std::cout << "[client] spawned player " << id << " at " << x << "," << y << std::endl;
     }
     else if (cmd == "PLAYER_MOVE") {
-        int id = std::stoi(parts[1]);
-        float x = std::stof(parts[2]);
-        float y = std::stof(parts[3]);
+        const int id = std::stoi(parts[1]);
+        const float x = std::stof(parts[2]);
+        const float y = std::stof(parts[3]);
         if (players.count(id)) {
             players[id].x = x;
             players[id].y = y;
         }
     }
     else if (cmd == "PLAYER_JOIN") {
-        int id = std::stoi(parts[1]);
-        float x = std::stof(parts[2]); //MAKE CONST ^ V
-        float y = std::stof(parts[3]);
+        const int id = std::stoi(parts[1]);
+        const float x = std::stof(parts[2]);
+        const float y = std::stof(parts[3]);
         players[id] = { id, x, y, false, "Player" + std::to_string(id) };
         std::cout << "[client] player " << id << " joined\n";
     }
     else if (cmd == "PLAYER_LEAVE") {
-        int id = std::stoi(parts[1]);
+        const int id = std::stoi(parts[1]);
         players.erase(id);
         std::cout << "[client] player " << id << " left\n";
     }
@@ -95,11 +94,11 @@ void Game::handleOneNetworkMessage(const std::string& msg) {
         int chunkY = std::stoi(parts[2]);
         auto chunk = std::make_unique<Chunk>(chunkX, chunkY);
 
-        int expectedTileCount = Chunk::SIZE * Chunk::SIZE;
+        constexpr int expectedTileCount = Chunk::SIZE * Chunk::SIZE;
         for (int i = 0; i < expectedTileCount; i++) {
-            int type = std::stoi(parts[3 + i]);
-            int x = i % Chunk::SIZE;
-            int y = i / Chunk::SIZE;
+            const int type = std::stoi(parts[3 + i]);
+            const int x = i % Chunk::SIZE;
+            const int y = i / Chunk::SIZE;
             chunk->setTile(x, y, type);
         }
 
@@ -109,7 +108,8 @@ void Game::handleOneNetworkMessage(const std::string& msg) {
     }
 }
 
-void Game::handleInput(const SDL_Event& e) {
+void Game::handleInput(const SDL_Event& e) const
+{
     if (localPlayerId == -1) return;
 
     std::string action;
@@ -123,7 +123,9 @@ void Game::handleInput(const SDL_Event& e) {
 
     std::ostringstream oss;
     oss << "INPUT," << localPlayerId << "," << action;
-    if (network) //IDE says always false but its wrong so dont change.
+
+    //IDE says always false but its wrong so don't change.
+    if (network)
         network->queueMessage(oss.str());
 }
 
@@ -133,11 +135,11 @@ void Game::render(SDL_Renderer* renderer) {
 
     // center camera on local player
     if (players.count(localPlayerId)) {
-        auto& p = players[localPlayerId];
+        const auto& p = players[localPlayerId];
         camera->centerOn(p.x + 16, p.y + 16);
     }
 
-    const int tilePxSize = 2;
+    constexpr int tilePxSize = 2;
 
     // calculate visible world area (frustum)
     const float camLeft = camera->x;
@@ -146,7 +148,7 @@ void Game::render(SDL_Renderer* renderer) {
     const float camBottom = camera->y + camera->screenHeight;
 
     // precompute chunk size in pixels
-    const int chunkPxSize = Chunk::SIZE * tilePxSize;
+    constexpr int chunkPxSize = Chunk::SIZE * tilePxSize;
 
     // draw only chunks inside the camera frustum
     for (auto& [key, chunkPtr] : world->chunks) {
@@ -221,55 +223,14 @@ void Game::render(SDL_Renderer* renderer) {
     SDL_RenderPresent(renderer);
 }
 
-void Game::printChunkLayout() {
-    std::cout << "[client] chunk layout grid:\n";
-
-    // collect all chunk coordinates
-    std::vector<std::pair<int, int>> coords;
-    coords.reserve(world->chunks.size());
-
-    for (auto& [key, _] : world->chunks) {
-        int x, y;
-        char comma;
-        std::istringstream ss(key);
-        if (ss >> x >> comma >> y)
-            coords.emplace_back(x, y);
-    }
-
-    // sort them by y, then x (to make the print deterministic)
-    std::sort(coords.begin(), coords.end(), [](auto& a, auto& b) {
-        if (a.second == b.second)
-            return a.first < b.first;
-        return a.second < b.second;
-    });
-
-    // determine grid size
-    int maxX = 0, maxY = 0;
-    for (auto& [x, y] : coords) {
-        maxX = std::max(maxX, x);
-        maxY = std::max(maxY, y);
-    }
-
-    // print grid
-    for (int y = maxY; y >= 0; --y) { // top-to-bottom to visualize properly
-        for (int x = 0; x <= maxX; ++x) {
-            if (std::find(coords.begin(), coords.end(), std::make_pair(x, y)) != coords.end())
-                std::cout << "(" << x << "," << y << ") ";
-            else
-                std::cout << "...... ";
-        }
-        std::cout << "\n";
-    }
-}
-
-
-void Game::drawText(SDL_Renderer* renderer, const std::string& text, int x, int y, SDL_Color color) {
+void Game::drawText(SDL_Renderer* renderer, const std::string& text, const int x, const int y, const SDL_Color color) const
+{
     if (!font) return;
     SDL_Surface* surface = TTF_RenderText_Solid(font, text.c_str(), color);
     if (!surface) return;
 
     SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_Rect dstRect = { x, y, surface->w, surface->h };
+    const SDL_Rect dstRect = { x, y, surface->w, surface->h };
     SDL_FreeSurface(surface);
     SDL_RenderCopy(renderer, texture, nullptr, &dstRect);
     SDL_DestroyTexture(texture);

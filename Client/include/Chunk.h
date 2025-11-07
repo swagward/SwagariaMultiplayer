@@ -4,13 +4,13 @@
 
 class Chunk {
 public:
-    static const int SIZE = 16;
+    static constexpr int SIZE = 16;
     int chunkX, chunkY;
     std::array<std::array<Tile, SIZE>, SIZE> tiles;
 
-    Chunk(int cx, int cy) : chunkX(cx), chunkY(cy) {}
+    Chunk(const int cx, const int cy) : chunkX(cx), chunkY(cy) {}
 
-    void setTile(int x, int y, int type) {
+    void setTile(const int x, const int y, const int type) {
         tiles[y][x].type = type;
     }
 };
