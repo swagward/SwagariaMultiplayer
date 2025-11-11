@@ -128,53 +128,58 @@ void Game::render(SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 30, 160, 230, 255);
     SDL_RenderClear(renderer);
 
-    constexpr int tilePxSize = 2;
+    constexpr int tilePxSize = 16;
 
-    //get window size to center the world
     int winW, winH;
     SDL_GetRendererOutputSize(renderer, &winW, &winH);
 
-    const int worldWidthPx  = World::WORLD_WIDTH_IN_CHUNKS * Chunk::SIZE * tilePxSize;
-    const int worldHeightPx = World::WORLD_HEIGHT_IN_CHUNKS * Chunk::SIZE * tilePxSize;
+    int offsetX = 0;
+    int offsetY = 0;
 
-    //center offset
-    const int offsetX = (winW / 2) - (worldWidthPx / 2);
-    const int offsetY = (winH / 2) - (worldHeightPx / 2);
+    // center the view on the local player
+    if (players.count(localPlayerId)) {
+        auto& p = players[localPlayerId];
+        int playerCenterX = static_cast<int>(p.x * tilePxSize + tilePxSize / 2);
+        int playerCenterY = static_cast<int>(p.y * tilePxSize + tilePxSize / 2);
 
+        offsetX = (winW / 2) - playerCenterX;
+        offsetY = (winH / 2) - playerCenterY;
+    }
+
+    // render all chunks
     for (auto& [key, chunkPtr] : world->chunks) {
         Chunk* chunk = chunkPtr.get();
-
-        const int chunkWorldX = chunk->chunkX * Chunk::SIZE * tilePxSize;
-        const int chunkWorldY = (World::WORLD_HEIGHT_IN_CHUNKS - 1 - chunk->chunkY) * Chunk::SIZE * tilePxSize;
+        int chunkWorldX = chunk->chunkX * Chunk::SIZE * tilePxSize;
+        int chunkWorldY = (World::WORLD_HEIGHT_IN_CHUNKS - 1 - chunk->chunkY) * Chunk::SIZE * tilePxSize;
 
         for (int y = 0; y < Chunk::SIZE; ++y) {
-            const int flippedY = Chunk::SIZE - 1 - y; //flip the tile vertically (otherwise chunks rendered upside down)
+            int flippedY = Chunk::SIZE - 1 - y;
             for (int x = 0; x < Chunk::SIZE; ++x) {
-                const auto& [type] = chunk->tiles[flippedY][x];
-                const int worldX = chunkWorldX + x * tilePxSize + offsetX;
-                const int worldY = chunkWorldY + y * tilePxSize + offsetY;
+                auto& [type] = chunk->tiles[flippedY][x];
+                int worldX = chunkWorldX + x * tilePxSize + offsetX;
+                int worldY = chunkWorldY + y * tilePxSize + offsetY;
+
+                if (type == 0) continue; // air
 
                 SDL_Rect tileRect{ worldX, worldY, tilePxSize, tilePxSize };
-
                 switch (type) {
-                    case 0: continue;                                                             //air
-                    case 1: SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); break;      //grass
-                    case 2: SDL_SetRenderDrawColor(renderer, 150, 50, 0, 255); break;     //dirt
-                    case 3: SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255); break;     //stone
-                    default: SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255); break;   //unknown
+                    case 1: SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); break;       // grass
+                    case 2: SDL_SetRenderDrawColor(renderer, 150, 50, 0, 255); break;      // dirt
+                    case 3: SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255); break;   // stone
+                    default: SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255); break;    // unknown
                 }
-
                 SDL_RenderFillRect(renderer, &tileRect);
             }
         }
     }
 
-    // draw players (2x2)
+    // render all players
     for (auto& [id, p] : players) {
         SDL_Rect rect{
-            static_cast<int>(p.x + offsetX),
-            static_cast<int>(p.y + offsetY),
-            2, 2
+            static_cast<int>(p.x * tilePxSize + offsetX),
+            static_cast<int>(p.y * tilePxSize + offsetY),
+            tilePxSize * 2,  // player width in pixels
+            tilePxSize * 2   // player height in pixels
         };
 
         if (p.isLocal)
@@ -187,6 +192,7 @@ void Game::render(SDL_Renderer* renderer) {
 
     SDL_RenderPresent(renderer);
 }
+
 
 
 void Game::drawText(SDL_Renderer* renderer, const std::string& text, const int x, const int y, const SDL_Color color) const {
