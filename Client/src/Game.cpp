@@ -178,8 +178,8 @@ void Game::render(SDL_Renderer* renderer) {
         SDL_Rect rect{
             static_cast<int>(p.x * tilePxSize + offsetX),
             static_cast<int>(p.y * tilePxSize + offsetY),
-            tilePxSize * 2,  // player width in pixels
-            tilePxSize * 2   // player height in pixels
+            tilePxSize,  // player width in pixels
+            tilePxSize   // player height in pixels
         };
 
         if (p.isLocal)
