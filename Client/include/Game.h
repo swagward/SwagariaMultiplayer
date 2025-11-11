@@ -6,7 +6,6 @@
 
 #include "Player.h"
 #include "World.h"
-#include "Camera.h"
 
 class Network;
 
@@ -29,7 +28,6 @@ public:
 private:
     Network* network = nullptr;
     std::unique_ptr<World> world;
-    std::unique_ptr<Camera> camera;
 
     int localPlayerId = -1;
     std::unordered_map<int, Player> players;

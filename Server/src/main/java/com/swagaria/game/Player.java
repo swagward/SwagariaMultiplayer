@@ -2,41 +2,70 @@ package com.swagaria.game;
 
 public class Player {
     private final int id;
-    private float x, y;
-    private float lastX, lastY;
-    private float vx = 0, vy = 0;
-    private final float moveSpeed = 100.0f;
-    private final float jumpVelocity = -250.0f;
-    private final float gravity = 500.0f;
-    private final float floorY = 300.0f;
 
-    private boolean up = false, down = false, left = false, right = false;
-    private boolean onGround = true;
+    // position in tiles (bottom-left corner)
+    private float x;
+    private float y;
 
-    public Player(int id, float x, float y) {
+    // previous position for hasMoved()
+    private float lastX;
+    private float lastY;
+
+    // velocity in tiles/sec
+    private float vx = 0f;
+    private float vy = 0f;
+
+    // input flags
+    private boolean up = false, left = false, right = false;
+
+    // physics constants
+    private static final float MOVE_SPEED = 6.0f;    // tiles/sec
+    private static final float JUMP_SPEED = 12.0f;   // tiles/sec
+    private static final float GRAVITY = -40.0f;     // tiles/sec^2 (down)
+    private static final float MAX_FALL_SPEED = 50.0f;
+
+    // player size (tiles)
+    public static final float WIDTH = 1.0f;
+    public static final float HEIGHT = 2.0f;
+
+    // grounded state
+    private boolean onGround = false;
+
+    public Player(int id, float spawnX, float spawnY) {
         this.id = id;
-        this.x = x;
-        this.y = y;
-        this.lastX = x;
-        this.lastY = y;
+        this.x = spawnX;
+        this.y = spawnY;
+        this.lastX = spawnX;
+        this.lastY = spawnY;
     }
 
     public int getId() { return id; }
+
     public float getX() { return x; }
     public float getY() { return y; }
 
+    public void setPosition(float nx, float ny) { this.x = nx; this.y = ny; }
+    public void setVelocity(float nvx, float nvy) { this.vx = nvx; this.vy = nvy; }
+    public float getVx() { return vx; }
+    public float getVy() { return vy; }
+
+    public boolean isOnGround() { return onGround; }
+    public void setOnGround(boolean g) { this.onGround = g; }
+
+    public boolean isMovingLeft() { return left; }
+    public boolean isMovingRight() { return right; }
+    public boolean isJumpPressed() { return up; }
+
+    public float getMoveSpeed() { return MOVE_SPEED; }
+    public float getJumpSpeed() { return JUMP_SPEED; }
+    public float getGravity() { return GRAVITY; }
+    public float getMaxFallSpeed() { return MAX_FALL_SPEED; }
+
+    // input handling
     public void setInput(String action, boolean pressed) {
         switch (action) {
-            case "UP_DOWN" -> {
-                up = pressed;
-                if (pressed && onGround) {
-                    vy = jumpVelocity;
-                    onGround = false;
-                }
-            }
+            case "UP_DOWN" -> up = pressed;
             case "UP_UP" -> up = false;
-            case "DOWN_DOWN" -> down = pressed;
-            case "DOWN_UP" -> down = false;
             case "LEFT_DOWN" -> left = pressed;
             case "LEFT_UP" -> left = false;
             case "RIGHT_DOWN" -> right = pressed;
@@ -44,24 +73,9 @@ public class Player {
         }
     }
 
-    public void update(float deltaTime) {
-        vx = 0;
-        if (left) vx -= moveSpeed;
-        if (right) vx += moveSpeed;
-
-        vy += gravity * deltaTime;
-        x += vx * deltaTime;
-        y += vy * deltaTime;
-
-        if (y > floorY) {
-            y = floorY;
-            vy = 0;
-            onGround = true;
-        }
-    }
-
+    // network helpers
     public boolean hasMoved() {
-        return Math.abs(x - lastX) > 0.01f || Math.abs(y - lastY) > 0.01f;
+        return Math.abs(x - lastX) > 0.001f || Math.abs(y - lastY) > 0.001f;
     }
 
     public void syncPosition() {

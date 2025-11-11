@@ -1,59 +1,90 @@
 package com.swagaria.game;
 
-import java.util.*;
+import com.swagaria.data.TerrainConfig;
+import com.swagaria.data.Tile;
+import com.swagaria.data.TileType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class World {
-    private final int worldWidth = 16;
-    private final int worldHeight = 16;
-    private final int tileSize = 16;
-    private final Map<String, Chunk> chunks = new HashMap<>();
+    private final Chunk[][] chunks;
 
     public World() {
-        // generate chunks so (0,0) is bottom-left
-        for (int cy = 0; cy < worldHeight; cy++) {
-            for (int cx = 0; cx < worldWidth; cx++) {
-                addChunk(new Chunk(cx, cy, 1));
+        chunks = new Chunk[TerrainConfig.WORLD_CHUNKS_X][TerrainConfig.WORLD_CHUNKS_Y];
+        generate();
+        System.out.println("[World] Generated " + (TerrainConfig.WORLD_CHUNKS_X * TerrainConfig.WORLD_CHUNKS_Y) + " chunks.");
+    }
+
+    private void generate() {
+        System.out.println("[World] Generating " + TerrainConfig.WORLD_CHUNKS_X + "x" + TerrainConfig.WORLD_CHUNKS_Y + " chunks...");
+        for (int cy = 0; cy < TerrainConfig.WORLD_CHUNKS_Y; cy++) {
+            for (int cx = 0; cx < TerrainConfig.WORLD_CHUNKS_X; cx++) {
+                Chunk chunk = new Chunk(cx, cy); // chunk generates itself in ctor
+                chunks[cx][cy] = chunk;
             }
         }
-        System.out.println("[World] Generated " + chunks.size() + " chunks.");
+        System.out.println("[World] Generation complete.");
     }
 
-    private void addChunk(Chunk chunk) {
-        chunks.put(key(chunk.getChunkX(), chunk.getChunkY()), chunk);
+    // return a list for code that expects getAllChunks()
+    public List<Chunk> getAllChunks() {
+        List<Chunk> list = new ArrayList<>();
+        for (int y = 0; y < TerrainConfig.WORLD_CHUNKS_Y; y++) {
+            for (int x = 0; x < TerrainConfig.WORLD_CHUNKS_X; x++) {
+                list.add(chunks[x][y]);
+            }
+        }
+        return list;
     }
 
-    public Collection<Chunk> getAllChunks() {
-        return chunks.values();
+    // convenience: return a chunk by chunk coords (or null)
+    public Chunk getChunk(int cx, int cy) {
+        if (cx < 0 || cx >= TerrainConfig.WORLD_CHUNKS_X || cy < 0 || cy >= TerrainConfig.WORLD_CHUNKS_Y) return null;
+        return chunks[cx][cy];
     }
 
-    private String key(int x, int y) {
-        return x + "," + y;
+    public Tile getTileAt(int worldX, int worldY) {
+        if (worldX < 0 || worldY < 0 ||
+                worldX >= TerrainConfig.WORLD_WIDTH ||
+                worldY >= TerrainConfig.WORLD_HEIGHT)
+            return null;
+
+        int chunkX = worldX / TerrainConfig.CHUNK_SIZE;
+        int chunkY = worldY / TerrainConfig.CHUNK_SIZE;
+
+        Chunk chunk = getChunk(chunkX, chunkY);
+        if (chunk == null) return null;
+
+        int localX = worldX % TerrainConfig.CHUNK_SIZE;
+        int localY = worldY % TerrainConfig.CHUNK_SIZE;
+
+        return chunk.getTile(localX, localY);
     }
 
-    public int getTileSize() {
-        return tileSize;
+    public boolean isSolidTile(int worldX, int worldY) {
+        Tile tile = getTileAt(worldX, worldY);
+        if (tile.getType() == TileType.AIR || tile == null) return false;
+
+        TileType type = tile.getType();
+        return (type == TileType.STONE || type == TileType.DIRT || type == TileType.GRASS);
     }
 
-    public boolean isSolidTile(int tileX, int tileY) {
-        int chunkSize = Chunk.SIZE;
+    // helper used earlier for spawn: find a spawn near middle
+    public int[] findSpawnTile() {
+        // middle X coordinate of the world in tile units
+        int worldMidX = TerrainConfig.WORLD_WIDTH / 2;
 
-        int chunkX = (int)Math.floor((float)tileX / chunkSize);
-        int chunkY = (int)Math.floor((float)tileY / chunkSize);
+        // approximate surface height by sampling noise at midX
+        int surfaceY = getSurfaceHeightAt(worldMidX);
 
-        String key = chunkX + "," + chunkY;
-        Chunk chunk = chunks.get(key);
-        if (chunk == null)
-            return false;
-
-        int localX = tileX - chunkX * chunkSize;
-        int localY = tileY - chunkY * chunkSize;
-
-        Tile tile = chunk.getTile(localX, localY);
-        if (tile == null)
-            return false;
-
-        int type = tile.getType();
-        return type == 1 || type == 2 || type == 3;
+        // spawn 1-2 tiles above surface
+        return new int[] { worldMidX, surfaceY + 2 };
     }
 
+
+    private int getSurfaceHeightAt(int worldX) {
+        double noise = TerrainConfig.NOISE.eval(worldX * TerrainConfig.NOISE_FREQ, 0);
+        return (int)(TerrainConfig.BASE_HEIGHT + noise * TerrainConfig.NOISE_AMP);
+    }
 }

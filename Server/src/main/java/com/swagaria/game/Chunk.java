@@ -1,63 +1,70 @@
 package com.swagaria.game;
 
-import com.swagaria.util.OpenSimplexNoise;
+import com.swagaria.data.TerrainConfig;
+import com.swagaria.data.Tile;
+import com.swagaria.data.TileType;
 
-//hello this is a comment
-//terrain chunk containing tiles
+/**
+ * Chunk coordinate system & conventions:
+ * - tiles[x][y]
+ *   - x: 0..CHUNK_SIZE-1 left -> right
+ *   - y: 0..CHUNK_SIZE-1 bottom -> top (y=0 is the bottom row)
+ *
+ * - Generation loops must follow:
+ *     for x=0..CHUNK_SIZE-1
+ *       for y=0..CHUNK_SIZE-1
+ *         worldX = chunkX*CHUNK_SIZE + x
+ *         worldY = chunkY*CHUNK_SIZE + y
+ *         compute tile based on worldY (bottom-up)
+ *         tiles[x][y] = new Tile(...)
+ *
+ * - Serialization order (network):
+ *     write tiles in the same order the client expects to read:
+ *       for y = 0..CHUNK_SIZE-1  (bottom -> top)
+ *         for x = 0..CHUNK_SIZE-1 (left -> right)
+ *           append tiles[x][y]
+ *
+ * This ensures no flips when client reconstructs chunk by:
+ *   x = i % CHUNK_SIZE
+ *   y = i / CHUNK_SIZE
+ */
 public class Chunk {
-    public static final int SIZE = 16;
+    public static final int SIZE = TerrainConfig.CHUNK_SIZE;
 
     private final int chunkX;
     private final int chunkY;
-    private final Tile[][] tiles = new Tile[SIZE][SIZE];
+    private final Tile[][] tiles; // tiles[x][y]
 
-    public Chunk(int chunkX, int chunkY, long worldSeed) {
+    public Chunk(int chunkX, int chunkY) {
         this.chunkX = chunkX;
         this.chunkY = chunkY;
-        generate(worldSeed);
+        this.tiles = new Tile[SIZE][SIZE];
+        generate(); // fill tiles according to the convention
     }
 
-    //generate procedural terrain using noise
-    private void generate(long worldSeed) {
-        OpenSimplexNoise heightNoise = new OpenSimplexNoise(worldSeed);
-        OpenSimplexNoise caveNoise = new OpenSimplexNoise(worldSeed + 1337);
-
-        final int worldHeight = SIZE * 16; //vertical scale
-        final double heightFrequency = 0.03;
-        final double caveFrequency = 0.08;
-
+    private void generate() {
+        // simple noise-based surface like earlier; y is bottom->top
         for (int x = 0; x < SIZE; x++) {
             int worldX = chunkX * SIZE + x;
 
-            //get the surface Y value
-            double heightValue = heightNoise.eval(worldX * heightFrequency, 0.0);
-            heightValue = (heightValue + 1.0) * 0.5;
-            int surfaceY = (int) (heightValue * (worldHeight * 0.5));
+            double noise = TerrainConfig.NOISE.eval(worldX * TerrainConfig.NOISE_FREQ, 0.0);
+            int surfaceY = (int) Math.floor(TerrainConfig.BASE_HEIGHT + noise * TerrainConfig.NOISE_AMP);
 
             for (int y = 0; y < SIZE; y++) {
-                int worldY = chunkY * SIZE + y;
+                int worldY = chunkY * SIZE + y; // bottom -> top
 
-                //flip the Y so top = bottom and vice versa (stupid java 2D origin
-                int arrayY = SIZE - 1 - y;
-
-                //generate cave pockets
-                double caveVal = caveNoise.eval(worldX * caveFrequency, worldY * caveFrequency);
-                boolean isCave = caveVal > 0.4;
-
-                int type;
+                Tile tile;
                 if (worldY > surfaceY) {
-                    type = 0; //air
-                } else if (isCave) {
-                    type = 0; //cave hole
+                    tile = new Tile(TileType.AIR);
                 } else if (worldY == surfaceY) {
-                    type = 1; //grass
+                    tile = new Tile(TileType.GRASS);
                 } else if (worldY > surfaceY - 3) {
-                    type = 2; //dirt
+                    tile = new Tile(TileType.DIRT);
                 } else {
-                    type = 3; //stone
+                    tile = new Tile(TileType.STONE);
                 }
 
-                tiles[arrayY][x] = new Tile(type);
+                tiles[x][y] = tile; // note tiles[x][y] (consistent)
             }
         }
     }
@@ -65,18 +72,29 @@ public class Chunk {
     public int getChunkX() { return chunkX; }
     public int getChunkY() { return chunkY; }
 
-    public Tile getTile(int x, int y) {
-        if (x < 0 || x >= SIZE || y < 0 || y >= SIZE)
-            return null;
-        return tiles[y][x];
+    // local coords expected in convention: x=0..SIZE-1, y=0..SIZE-1 bottom->top
+    public Tile getTile(int localX, int localY) {
+        if (localX < 0 || localX >= SIZE || localY < 0 || localY >= SIZE) return null;
+        return tiles[localX][localY];
     }
 
+    public void setTile(int localX, int localY, int tileTypeOrdinal) {
+        if (localX < 0 || localX >= SIZE || localY < 0 || localY >= SIZE) return;
+        TileType t = TileType.values()[tileTypeOrdinal];
+        tiles[localX][localY] = new Tile(t);
+    }
+
+    // Serialize bottom->top, left->right so client parsing (x = i%SIZE, y = i/SIZE)
     public String serialize() {
         StringBuilder sb = new StringBuilder();
         sb.append("CHUNK_DATA,").append(chunkX).append(",").append(chunkY);
-        for (int y = 0; y < SIZE; y++) {
-            for (int x = 0; x < SIZE; x++) {
-                sb.append(",").append(tiles[y][x].type);
+
+        // write in this exact order: y=0..SIZE-1, x=0..SIZE-1
+        for (int y = 0; y < SIZE; y++) {              // bottom -> top
+            for (int x = 0; x < SIZE; x++) {          // left -> right
+                Tile t = tiles[x][y];
+                int ordinal = (t == null) ? TileType.AIR.ordinal() : t.getType().ordinal();
+                sb.append(",").append(ordinal);
             }
         }
         return sb.toString();

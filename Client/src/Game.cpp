@@ -1,24 +1,21 @@
 #include "../include/Game.h"
 
 #include <algorithm>
-
-#include "../include/Network.h"
 #include <sstream>
+#include "../include/Network.h"
 
 Game::Game() {
     if (TTF_Init() == -1) {
         std::cerr << "[sdl_ttf] failed to initialize: " << TTF_GetError() << std::endl;
     } else {
-        font = TTF_OpenFont("C:/Windows/Fonts/arial.ttf", 16); //add font file inside of game so not pulling from windows dir (would break on linux/mac)
+        font = TTF_OpenFont("C:/Windows/Fonts/arial.ttf", 16);
         if (!font)
             std::cerr << "[sdl_ttf] failed to load font: " << TTF_GetError() << std::endl;
         else
             std::cout << "[sdl_ttf] font loaded successfully.\n";
     }
 
-    //create world and camera with screen size
     world = std::make_unique<World>();
-    camera = std::make_unique<Camera>(800, 600);
 }
 
 Game::~Game() {
@@ -54,7 +51,8 @@ void Game::handleOneNetworkMessage(const std::string& msg) {
 
     if (parts.empty()) return;
 
-    if (const std::string& cmd = parts[0]; cmd == "ASSIGN_ID") {
+    const std::string& cmd = parts[0];
+    if (cmd == "ASSIGN_ID") {
         localPlayerId = std::stoi(parts[1]);
         std::cout << "[client] assigned id " << localPlayerId << std::endl;
     }
@@ -104,12 +102,10 @@ void Game::handleOneNetworkMessage(const std::string& msg) {
 
         world->addChunk(std::move(chunk));
         std::cout << "[client] received chunk (" << chunkX << "," << chunkY << ")\n";
-        //printChunkLayout();
     }
 }
 
-void Game::handleInput(const SDL_Event& e) const
-{
+void Game::handleInput(const SDL_Event& e) const {
     if (localPlayerId == -1) return;
 
     std::string action;
@@ -124,8 +120,7 @@ void Game::handleInput(const SDL_Event& e) const
     std::ostringstream oss;
     oss << "INPUT," << localPlayerId << "," << action;
 
-    //IDE says always false but its wrong so don't change.
-    if (network)
+    if (network) //
         network->queueMessage(oss.str());
 }
 
@@ -133,98 +128,68 @@ void Game::render(SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 30, 160, 230, 255);
     SDL_RenderClear(renderer);
 
-    // center camera on local player
-    if (players.count(localPlayerId)) {
-        const auto& p = players[localPlayerId];
-        camera->centerOn(p.x + 16, p.y + 16);
-    }
-
     constexpr int tilePxSize = 2;
 
-    // calculate visible world area (frustum)
-    const float camLeft = camera->x;
-    const float camTop = camera->y;
-    const float camRight = camera->x + camera->screenWidth;
-    const float camBottom = camera->y + camera->screenHeight;
+    //get window size to center the world
+    int winW, winH;
+    SDL_GetRendererOutputSize(renderer, &winW, &winH);
 
-    // precompute chunk size in pixels
-    constexpr int chunkPxSize = Chunk::SIZE * tilePxSize;
+    const int worldWidthPx  = World::WORLD_WIDTH_IN_CHUNKS * Chunk::SIZE * tilePxSize;
+    const int worldHeightPx = World::WORLD_HEIGHT_IN_CHUNKS * Chunk::SIZE * tilePxSize;
 
-    // draw only chunks inside the camera frustum
+    //center offset
+    const int offsetX = (winW / 2) - (worldWidthPx / 2);
+    const int offsetY = (winH / 2) - (worldHeightPx / 2);
+
     for (auto& [key, chunkPtr] : world->chunks) {
         Chunk* chunk = chunkPtr.get();
 
-        // compute chunk bounds in world space
-        const int chunkWorldX = chunk->chunkX * chunkPxSize;
-        const int chunkWorldY = (World::WORLD_HEIGHT_IN_CHUNKS - 1 - chunk->chunkY) * chunkPxSize;
-        const int chunkRight = chunkWorldX + chunkPxSize;
-        const int chunkBottom = chunkWorldY + chunkPxSize;
+        const int chunkWorldX = chunk->chunkX * Chunk::SIZE * tilePxSize;
+        const int chunkWorldY = (World::WORLD_HEIGHT_IN_CHUNKS - 1 - chunk->chunkY) * Chunk::SIZE * tilePxSize;
 
-        // frustum culling: skip chunks fully outside the camera view
-        if (chunkRight < camLeft || chunkWorldX > camRight ||
-            chunkBottom < camTop || chunkWorldY > camBottom) {
-            continue;
-        }
-
-        // draw visible tiles in chunk
         for (int y = 0; y < Chunk::SIZE; ++y) {
+            const int flippedY = Chunk::SIZE - 1 - y; //flip the tile vertically (otherwise chunks rendered upside down)
             for (int x = 0; x < Chunk::SIZE; ++x) {
-                Tile& t = chunk->tiles[y][x];
-                if (t.type == 0) continue;
+                const auto& [type] = chunk->tiles[flippedY][x];
+                const int worldX = chunkWorldX + x * tilePxSize + offsetX;
+                const int worldY = chunkWorldY + y * tilePxSize + offsetY;
 
-                const int worldX = chunkWorldX + x * tilePxSize;
-                const int worldY = chunkWorldY + y * tilePxSize;
+                SDL_Rect tileRect{ worldX, worldY, tilePxSize, tilePxSize };
 
-                // skip tiles outside view
-                if (worldX + tilePxSize < camLeft || worldX > camRight ||
-                    worldY + tilePxSize < camTop || worldY > camBottom) {
-                    continue;
+                switch (type) {
+                    case 0: continue;                                                             //air
+                    case 1: SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); break;      //grass
+                    case 2: SDL_SetRenderDrawColor(renderer, 150, 50, 0, 255); break;     //dirt
+                    case 3: SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255); break;     //stone
+                    default: SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255); break;   //unknown
                 }
-
-                SDL_Rect tileRect{
-                    camera->worldToScreenX(worldX),
-                    camera->worldToScreenY(worldY),
-                    tilePxSize, tilePxSize
-                };
-
-                if (t.type == 1)
-                    SDL_SetRenderDrawColor(renderer, 150, 75, 0, 255); // dirt
-                else
-                    SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255); // stone
 
                 SDL_RenderFillRect(renderer, &tileRect);
             }
         }
     }
 
-    // draw players (with camera)
+    // draw players (2x2)
     for (auto& [id, p] : players) {
         SDL_Rect rect{
-            camera->worldToScreenX(p.x),
-            camera->worldToScreenY(p.y),
-            32, 32
+            static_cast<int>(p.x + offsetX),
+            static_cast<int>(p.y + offsetY),
+            2, 2
         };
 
         if (p.isLocal)
-            SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
         else
             SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
 
         SDL_RenderFillRect(renderer, &rect);
-
-        if (!p.name.empty()) {
-            drawText(renderer, p.name,
-                camera->worldToScreenX(p.x) - 10,
-                camera->worldToScreenY(p.y) - 25,
-                p.isLocal ? SDL_Color{0,255,0,255} : SDL_Color{255,255,0,255});
-        }
     }
 
     SDL_RenderPresent(renderer);
 }
 
-void Game::drawText(SDL_Renderer* renderer, const std::string& text, const int x, const int y, const SDL_Color color) const
-{
+
+void Game::drawText(SDL_Renderer* renderer, const std::string& text, const int x, const int y, const SDL_Color color) const {
     if (!font) return;
     SDL_Surface* surface = TTF_RenderText_Solid(font, text.c_str(), color);
     if (!surface) return;

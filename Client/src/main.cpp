@@ -24,7 +24,6 @@ int main(int argc, char* argv[]) {
     bool isRunning = true;
     SDL_Event event;
 
-    //fps tracking variables
     Uint32 fpsLastTime = SDL_GetTicks();
     Uint32 fpsFrames = 0;
     float fps = 0.0f;
@@ -43,7 +42,7 @@ int main(int argc, char* argv[]) {
 
         //fps counting
         fpsFrames++;
-        if (const Uint32 currentTime = SDL_GetTicks(); currentTime - fpsLastTime >= 500) { //update every 0.5s
+        if (const Uint32 currentTime = SDL_GetTicks(); currentTime - fpsLastTime >= 500) { //update every half second
             fps = (fpsFrames * 1000.0f) / (currentTime - fpsLastTime);
             fpsLastTime = currentTime;
             fpsFrames = 0;
