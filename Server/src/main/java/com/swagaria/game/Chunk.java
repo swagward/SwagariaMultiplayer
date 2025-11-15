@@ -43,18 +43,25 @@ public class Chunk {
     }
 
     private void generate() {
-        // simple noise-based surface like earlier; y is bottom->top
         for (int x = 0; x < SIZE; x++) {
             int worldX = chunkX * SIZE + x;
 
-            double noise = TerrainConfig.NOISE.eval(worldX * TerrainConfig.NOISE_FREQ, 0.0);
-            int surfaceY = (int) Math.floor(TerrainConfig.BASE_HEIGHT + noise * TerrainConfig.NOISE_AMP);
+            // --- base surface (hills/mountains) ---
+            double heightNoise = TerrainConfig.NOISE.eval(worldX * TerrainConfig.NOISE_FREQ, 0.0);
+            int surfaceY = (int) Math.floor(TerrainConfig.BASE_HEIGHT + heightNoise * TerrainConfig.NOISE_AMP);
 
             for (int y = 0; y < SIZE; y++) {
                 int worldY = chunkY * SIZE + y; // bottom -> top
-
                 Tile tile;
+
+                // --- cave check ---
+                // Use 2D noise: if value > threshold, leave air
+                double caveNoise = TerrainConfig.NOISE.eval(worldX * 0.1, worldY * 0.1);
+                boolean isCave = (caveNoise > 0.3) && (worldY < surfaceY - 3); // only underground
+
                 if (worldY > surfaceY) {
+                    tile = new Tile(TileType.AIR);
+                } else if (isCave) {
                     tile = new Tile(TileType.AIR);
                 } else if (worldY == surfaceY) {
                     tile = new Tile(TileType.GRASS);
@@ -64,7 +71,7 @@ public class Chunk {
                     tile = new Tile(TileType.STONE);
                 }
 
-                tiles[x][y] = tile; // note tiles[x][y] (consistent)
+                tiles[x][y] = tile;
             }
         }
     }

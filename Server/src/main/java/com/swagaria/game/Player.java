@@ -21,7 +21,7 @@ public class Player {
     // physics constants
     private static final float MOVE_SPEED = 6.0f;    // tiles/sec
     private static final float JUMP_SPEED = 12.0f;   // tiles/sec
-    private static final float GRAVITY = -40.0f;     // tiles/sec^2 (down)
+    private static final float GRAVITY = 40.0f;     // tiles/sec^2 (down)
     private static final float MAX_FALL_SPEED = 50.0f;
 
     // player size (tiles)

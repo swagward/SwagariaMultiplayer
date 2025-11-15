@@ -173,13 +173,13 @@ void Game::render(SDL_Renderer* renderer) {
         }
     }
 
-    // render all players
+    //render all players
     for (auto& [id, p] : players) {
         SDL_Rect rect{
             static_cast<int>(p.x * tilePxSize + offsetX),
-            static_cast<int>(p.y * tilePxSize + offsetY),
-            tilePxSize,  // player width in pixels
-            tilePxSize   // player height in pixels
+            static_cast<int>(offsetY + p.y * tilePxSize),
+            tilePxSize,      //player width in pixels (1 tile wide)
+            tilePxSize * 2   //player height in pixels (2 tiles tall)
         };
 
         if (p.isLocal)
@@ -192,8 +192,6 @@ void Game::render(SDL_Renderer* renderer) {
 
     SDL_RenderPresent(renderer);
 }
-
-
 
 void Game::drawText(SDL_Renderer* renderer, const std::string& text, const int x, const int y, const SDL_Color color) const {
     if (!font) return;

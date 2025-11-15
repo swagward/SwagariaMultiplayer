@@ -18,7 +18,7 @@ public class Server {
     private final Map<Integer, Player> players = new ConcurrentHashMap<>();
     private final List<ClientHandler> handlers = new CopyOnWriteArrayList<>();
     private final World world = new World();
-    private volatile boolean running = true;
+    private final boolean running = true;
 
     private final ScheduledExecutorService tickExecutor = Executors.newSingleThreadScheduledExecutor();
     private long lastUpdateTime = System.nanoTime();
@@ -48,6 +48,9 @@ public class Server {
                 pool.submit(h);
 
                 System.out.println("[Server] Player #" + id + " connected.");
+                System.out.println("check tile at (10,44): " + world.isSolidTile(10,44));
+                System.out.println("check tile at (10,60): " + world.isSolidTile(10,60));
+                System.out.println("check tile at (10,100): " + world.isSolidTile(10,100));
             }
         }
     }
@@ -77,7 +80,7 @@ public class Server {
         lastUpdateTime = now;
 
         for (Player p : players.values()) {
-            Physics.stepPlayer(p, deltaTime);
+            Physics.stepPlayer(p, getWorld(), deltaTime);
             if (p.hasMoved()) {
                 broadcast("PLAYER_MOVE," + p.getId() + "," + p.getX() + "," + p.getY());
                 p.syncPosition();

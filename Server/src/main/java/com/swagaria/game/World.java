@@ -50,14 +50,17 @@ public class World {
                 worldY >= TerrainConfig.WORLD_HEIGHT)
             return null;
 
+        // FIX: convert top-left Y -> bottom-left Y
+        int realY = TerrainConfig.WORLD_HEIGHT - 1 - worldY;
+
         int chunkX = worldX / TerrainConfig.CHUNK_SIZE;
-        int chunkY = worldY / TerrainConfig.CHUNK_SIZE;
+        int chunkY = realY / TerrainConfig.CHUNK_SIZE;
 
         Chunk chunk = getChunk(chunkX, chunkY);
         if (chunk == null) return null;
 
         int localX = worldX % TerrainConfig.CHUNK_SIZE;
-        int localY = worldY % TerrainConfig.CHUNK_SIZE;
+        int localY = realY % TerrainConfig.CHUNK_SIZE;
 
         return chunk.getTile(localX, localY);
     }
@@ -81,7 +84,6 @@ public class World {
         // spawn 1-2 tiles above surface
         return new int[] { worldMidX, surfaceY + 2 };
     }
-
 
     private int getSurfaceHeightAt(int worldX) {
         double noise = TerrainConfig.NOISE.eval(worldX * TerrainConfig.NOISE_FREQ, 0);
