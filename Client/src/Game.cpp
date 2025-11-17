@@ -4,6 +4,8 @@
 #include <sstream>
 #include "../include/Network.h"
 
+#define TILE_PX_SIZE 16
+
 Game::Game() {
     if (TTF_Init() == -1) {
         std::cerr << "[sdl_ttf] failed to initialize: " << TTF_GetError() << std::endl;
@@ -128,8 +130,6 @@ void Game::render(SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 30, 160, 230, 255);
     SDL_RenderClear(renderer);
 
-    constexpr int tilePxSize = 16;
-
     int winW, winH;
     SDL_GetRendererOutputSize(renderer, &winW, &winH);
 
@@ -139,8 +139,8 @@ void Game::render(SDL_Renderer* renderer) {
     // center the view on the local player
     if (players.count(localPlayerId)) {
         auto& p = players[localPlayerId];
-        int playerCenterX = static_cast<int>(p.x * tilePxSize + tilePxSize / 2);
-        int playerCenterY = static_cast<int>(p.y * tilePxSize + tilePxSize / 2);
+        int playerCenterX = static_cast<int>(p.x * TILE_PX_SIZE + TILE_PX_SIZE / 2);
+        int playerCenterY = static_cast<int>(p.y * TILE_PX_SIZE + TILE_PX_SIZE / 2);
 
         offsetX = (winW / 2) - playerCenterX;
         offsetY = (winH / 2) - playerCenterY;
@@ -149,19 +149,19 @@ void Game::render(SDL_Renderer* renderer) {
     // render all chunks
     for (auto& [key, chunkPtr] : world->chunks) {
         Chunk* chunk = chunkPtr.get();
-        int chunkWorldX = chunk->chunkX * Chunk::SIZE * tilePxSize;
-        int chunkWorldY = (World::WORLD_HEIGHT_IN_CHUNKS - 1 - chunk->chunkY) * Chunk::SIZE * tilePxSize;
+        int chunkWorldX = chunk->chunkX * Chunk::SIZE * TILE_PX_SIZE;
+        int chunkWorldY = (World::WORLD_HEIGHT_IN_CHUNKS - 1 - chunk->chunkY) * Chunk::SIZE * TILE_PX_SIZE;
 
         for (int y = 0; y < Chunk::SIZE; ++y) {
             int flippedY = Chunk::SIZE - 1 - y;
             for (int x = 0; x < Chunk::SIZE; ++x) {
                 auto& [type] = chunk->tiles[flippedY][x];
-                int worldX = chunkWorldX + x * tilePxSize + offsetX;
-                int worldY = chunkWorldY + y * tilePxSize + offsetY;
+                int worldX = chunkWorldX + x * TILE_PX_SIZE + offsetX;
+                int worldY = chunkWorldY + y * TILE_PX_SIZE + offsetY;
 
                 if (type == 0) continue; // air
 
-                SDL_Rect tileRect{ worldX, worldY, tilePxSize, tilePxSize };
+                SDL_Rect tileRect{ worldX, worldY, TILE_PX_SIZE, TILE_PX_SIZE };
                 switch (type) {
                     case 1: SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); break;       // grass
                     case 2: SDL_SetRenderDrawColor(renderer, 150, 50, 0, 255); break;      // dirt
@@ -176,10 +176,10 @@ void Game::render(SDL_Renderer* renderer) {
     //render all players
     for (auto& [id, p] : players) {
         SDL_Rect rect{
-            static_cast<int>(p.x * tilePxSize + offsetX),
-            static_cast<int>(offsetY + p.y * tilePxSize),
-            tilePxSize,      //player width in pixels (1 tile wide)
-            tilePxSize * 2   //player height in pixels (2 tiles tall)
+            static_cast<int>(p.x * TILE_PX_SIZE + offsetX),
+            static_cast<int>(p.y * TILE_PX_SIZE + offsetY),
+            TILE_PX_SIZE,      //player width in pixels (1 tile wide)
+            TILE_PX_SIZE * 2   //player height in pixels (2 tiles tall)
         };
 
         if (p.isLocal)
