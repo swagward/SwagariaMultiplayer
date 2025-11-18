@@ -1,9 +1,13 @@
 #include "../include/Game.h"
-
+#include "../include/Network.h"
 #include <algorithm>
 #include <cmath>
 #include <sstream>
-#include "../include/Network.h"
+
+#include "../include/TextureManager.h"
+
+
+class TextureManager;
 
 Game::Game()
 {
@@ -58,7 +62,8 @@ void Game::handleOneNetworkMessage(const std::string& msg)
 
     while (std::getline(ss, token, ','))
         parts.push_back(token);
-    if (parts.empty()) return;
+    if (parts.empty())
+        return;
 
     if (const std::string& cmd = parts[0]; cmd == "ASSIGN_ID")
     {
@@ -208,6 +213,8 @@ void Game::render(SDL_Renderer* renderer)
     cameraX = 0;
     cameraY = 0;
 
+    TextureManager& texManager = TextureManager::getInstance();
+
     //center the view on the local player
     if (players.count(localPlayerId))
     {
@@ -236,17 +243,22 @@ void Game::render(SDL_Renderer* renderer)
                 const int worldY = chunkWorldY + y * World::TILE_PX_SIZE + cameraY;
 
                 //TODO: change from SDL_Rects to textures, reduces draw calls and more fps hopefully
-                if (type == 0) continue; // air
+                if (type == 0) continue; //air
 
-                SDL_Rect tileRect{ worldX, worldY, World::TILE_PX_SIZE, World::TILE_PX_SIZE };
+                std::string textureId;
                 switch (type)
                 {
-                    case 1: SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); break;       // grass
-                    case 2: SDL_SetRenderDrawColor(renderer, 150, 50, 0, 255); break;      // dirt
-                    case 3: SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255); break;   // stone
-                    default: SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255); break;    // unknown
+                    case 1: textureId = "grass"; break;
+                    case 2: textureId = "dirt"; break;
+                    case 3: textureId = "stone"; break;
+                    default: //if tile doesnt have a texture or is unknown just draw pink square
+                        SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
+                        SDL_Rect missingTile { worldX, worldY, World::TILE_PX_SIZE, World::TILE_PX_SIZE };
+                        SDL_RenderFillRect(renderer, &missingTile);
+                        continue;
                 }
-                SDL_RenderFillRect(renderer, &tileRect);
+
+                texManager.draw(renderer, textureId, worldX, worldY, World::TILE_PX_SIZE, World::TILE_PX_SIZE);
             }
         }
     }

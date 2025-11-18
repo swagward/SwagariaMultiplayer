@@ -29,13 +29,17 @@ public:
 private:
     Network* network = nullptr;
     std::unique_ptr<World> world;
+    TTF_Font* font = nullptr;
 
     int localPlayerId = -1;
     std::unordered_map<int, Player> players;
-    TTF_Font* font = nullptr;
 
     int cameraX = 0;
     int cameraY = 0;
+
+    //uhhhhh
+    int currentHeldItem = 1; //???
+
 
     std::mutex incomingMutex;
     std::queue<std::string> incomingMessages;

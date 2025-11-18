@@ -1,5 +1,7 @@
+#include "SDL_image.h"
 #include "../include/Game.h"
 #include "../include/Network.h"
+#include "../include/TextureManager.h"
 
 int main(int argc, char* argv[])
 {
@@ -7,6 +9,11 @@ int main(int argc, char* argv[])
     {
         std::cerr << "failed to initialize sdl: " << SDL_GetError() << std::endl;
         return -1;
+    }
+
+    if (!(IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG) & (IMG_INIT_PNG | IMG_INIT_JPG)))
+    {
+        std::cerr << "failed to initialize SDL_image: " << SDL_GetError() << std::endl;
     }
 
     SDL_Window* window = SDL_CreateWindow("Swagaria",
@@ -23,6 +30,12 @@ int main(int argc, char* argv[])
         std::cerr << "failed to connect to server" << std::endl;
         return -1;
     }
+
+    //load game textures
+    TextureManager& texManager = TextureManager::getInstance();
+    texManager.loadTexture("grass", "assets/textures/grass.png", renderer);
+    texManager.loadTexture("dirt", "assets/textures/dirt.png", renderer);
+    texManager.loadTexture("stone", "assets/textures/stone.png", renderer);
 
     bool isRunning = true;
     SDL_Event event;
