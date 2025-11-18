@@ -52,7 +52,6 @@ public class OpenSimplexNoise {
 
         double xins = xs - xsb;
         double yins = ys - ysb;
-        double inSum = xins + yins;
 
         double dx0 = x - xb;
         double dy0 = y - yb;

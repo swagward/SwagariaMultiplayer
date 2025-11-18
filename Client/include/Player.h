@@ -1,7 +1,8 @@
 #pragma once
 #include <iostream>
 
-struct Player {
+struct Player
+{
     int id;
     float x, y;
     bool isLocal;

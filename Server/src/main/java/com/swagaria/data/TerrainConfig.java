@@ -2,7 +2,8 @@ package com.swagaria.data;
 
 import com.swagaria.util.OpenSimplexNoise;
 
-public class TerrainConfig {
+public class TerrainConfig
+{
     public static final int CHUNK_SIZE = 16;
     public static final int WORLD_CHUNKS_X = 16;
     public static final int WORLD_CHUNKS_Y = 16;

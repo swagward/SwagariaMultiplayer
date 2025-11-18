@@ -8,7 +8,8 @@
 class Game;
 class World;
 
-class Network {
+class Network
+{
 public:
     Network();
     ~Network();

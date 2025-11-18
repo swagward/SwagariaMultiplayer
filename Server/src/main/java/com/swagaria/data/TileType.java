@@ -1,6 +1,7 @@
 package com.swagaria.data;
 
-public enum TileType {
+public enum TileType //more to come
+{
     AIR,
     GRASS,
     DIRT,

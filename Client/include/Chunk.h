@@ -2,7 +2,8 @@
 #include <array>
 #include "Tile.h"
 
-class Chunk {
+class Chunk
+{
 public:
     static constexpr int SIZE = 16;
     int chunkX, chunkY;
@@ -10,7 +11,8 @@ public:
 
     Chunk(const int cx, const int cy) : chunkX(cx), chunkY(cy) {}
 
-    void setTile(const int x, const int y, const int type) {
+    void setTile(const int x, const int y, const int type)
+    {
         tiles[y][x].type = type;
     }
 };

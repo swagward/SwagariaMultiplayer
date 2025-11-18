@@ -1,8 +1,10 @@
 #include "../include/Game.h"
 #include "../include/Network.h"
 
-int main(int argc, char* argv[]) {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+int main(int argc, char* argv[])
+{
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    {
         std::cerr << "failed to initialize sdl: " << SDL_GetError() << std::endl;
         return -1;
     }
@@ -16,7 +18,8 @@ int main(int argc, char* argv[]) {
     network.setGame(&game);
     game.setNetwork(&network);
 
-    if (!network.connectToServer("127.0.0.1", 25565)) {
+    if (!network.connectToServer("127.0.0.1", 25565))
+    {
         std::cerr << "failed to connect to server" << std::endl;
         return -1;
     }
@@ -28,21 +31,23 @@ int main(int argc, char* argv[]) {
     Uint32 fpsFrames = 0;
     float fps = 0.0f;
 
-    while (isRunning) {
+    while (isRunning)
+    {
         //handle input
-        while (SDL_PollEvent(&event)) {
+        while (SDL_PollEvent(&event))
+        {
             if (event.type == SDL_QUIT) isRunning = false;
-            if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && event.key.repeat == 0)
-                game.handleInput(event);
+            else game.handleInput(event);
         }
 
         //game logic
         game.processNetworkMessages();
         game.render(renderer);
 
-        //fps counting
+        //fps counting in title bar
         fpsFrames++;
-        if (const Uint32 currentTime = SDL_GetTicks(); currentTime - fpsLastTime >= 500) { //update every half second
+        if (const Uint32 currentTime = SDL_GetTicks(); currentTime - fpsLastTime >= 500)
+        {   //update every half second
             fps = (fpsFrames * 1000.0f) / (currentTime - fpsLastTime);
             fpsLastTime = currentTime;
             fpsFrames = 0;

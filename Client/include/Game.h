@@ -9,15 +9,16 @@
 
 class Network;
 
-class Game {
+class Game
+{
 public:
     Game();
     ~Game();
 
     void setNetwork(Network* n) { network = n; }
     void pushNetworkMessage(const std::string& msg); //called from network thread
-    void processNetworkMessages(); //called from main thread
-    void handleInput(const SDL_Event& e) const; //called from main thread
+    void processNetworkMessages();                   //called from main thread
+    void handleInput(const SDL_Event& e) const;      //called from main thread
     void render(SDL_Renderer* renderer);
 
     int getLocalPlayerId() const { return localPlayerId; }
@@ -32,6 +33,9 @@ private:
     int localPlayerId = -1;
     std::unordered_map<int, Player> players;
     TTF_Font* font = nullptr;
+
+    int cameraX = 0;
+    int cameraY = 0;
 
     std::mutex incomingMutex;
     std::queue<std::string> incomingMessages;
