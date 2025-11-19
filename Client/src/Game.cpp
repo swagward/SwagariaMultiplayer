@@ -145,7 +145,7 @@ void Game::handleOneNetworkMessage(const std::string& msg)
     }
 }
 
-void Game::handleInput(const SDL_Event& e) const
+void Game::handleInput(const SDL_Event& e)
 {
     if (localPlayerId == -1)
         return;
@@ -176,7 +176,7 @@ void Game::handleInput(const SDL_Event& e) const
         if (e.button.button == SDL_BUTTON_LEFT)
             tileToSend = 0; //left click to break (placing air)
         else if (e.button.button == SDL_BUTTON_RIGHT)
-            tileToSend = 1; //right click to place (placing grass)
+            tileToSend = currentHeldItem; //right click to place (any tile)
 
         if (tileToSend == -1)
             return; //discard because value unchanged
@@ -199,12 +199,28 @@ void Game::handleInput(const SDL_Event& e) const
         if (network)
             network->queueMessage(oss.str());
     }
-    //next handle player camera zoom
+    //handle block selection
+    else if (e.type == SDL_MOUSEWHEEL)
+    {
+        auto index = std::find(tiles.begin(), tiles.end(),currentHeldItem);
+        if (index == tiles.end())
+            index = tiles.begin(); //reset if invalid
+
+        int currentIndex = std::distance(tiles.begin(), index);
+        if (e.wheel.y > 0)
+            currentIndex = (currentIndex + 1) % tiles.size();
+        else if (e.wheel.y < 0)
+            currentIndex = (currentIndex - 1 + tiles.size()) % tiles.size();
+
+        currentHeldItem = tiles[currentIndex];
+    }
 }
 
 void Game::render(SDL_Renderer* renderer)
 {
-    SDL_SetRenderDrawColor(renderer, 30, 160, 230, 255); //basic blue background
+    const TextureManager& texManager = TextureManager::getInstance();
+    std::string textureId;
+    SDL_SetRenderDrawColor(renderer, 30, 160, 230, 255); //basic sky backdrop (replace with png later)
     SDL_RenderClear(renderer);
 
     int winW, winH;
@@ -212,8 +228,6 @@ void Game::render(SDL_Renderer* renderer)
 
     cameraX = 0;
     cameraY = 0;
-
-    TextureManager& texManager = TextureManager::getInstance();
 
     //center the view on the local player
     if (players.count(localPlayerId))
@@ -245,12 +259,13 @@ void Game::render(SDL_Renderer* renderer)
                 //TODO: change from SDL_Rects to textures, reduces draw calls and more fps hopefully
                 if (type == 0) continue; //air
 
-                std::string textureId;
                 switch (type)
                 {
                     case 1: textureId = "grass"; break;
                     case 2: textureId = "dirt"; break;
                     case 3: textureId = "stone"; break;
+                    case 4: textureId = "wood_log"; break;
+                    case 5: textureId = "wood_plank"; break;
                     default: //if tile doesnt have a texture or is unknown just draw pink square
                         SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
                         SDL_Rect missingTile { worldX, worldY, World::TILE_PX_SIZE, World::TILE_PX_SIZE };
@@ -281,6 +296,26 @@ void Game::render(SDL_Renderer* renderer)
 
         SDL_RenderFillRect(renderer, &rect);
     }
+
+    //render UI
+    std::string blockName;
+    switch (currentHeldItem)
+    {
+        case 1: textureId = "grass"; blockName = "Grass"; break;
+        case 2: textureId = "dirt"; blockName = "Dirt"; break;
+        case 3: textureId = "stone"; blockName = "Stone"; break;
+        case 4: textureId = "wood_log"; blockName = "Wood Log"; break;
+        case 5: textureId = "wood_plank"; blockName = "Wood Plank"; break;
+    }
+
+    const int iconSize = 32;
+    const int margin = 10;
+    if (currentHeldItem != 0)
+        texManager.draw(renderer, textureId, margin, margin, iconSize, iconSize);
+
+    SDL_Color textColor = { 255, 255, 255, 255 };
+    std::string hotbarText = "Selected: " + blockName;
+    drawText(renderer, hotbarText, margin + iconSize + 5, margin + 8, textColor);
 
     SDL_RenderPresent(renderer);
 }

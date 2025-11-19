@@ -5,5 +5,7 @@ public enum TileType //more to come
     AIR,
     GRASS,
     DIRT,
-    STONE
+    STONE,
+    WOOD_LOG,
+    WOOD_PLANK
 }

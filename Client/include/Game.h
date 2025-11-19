@@ -18,7 +18,7 @@ public:
     void setNetwork(Network* n) { network = n; }
     void pushNetworkMessage(const std::string& msg); //called from network thread
     void processNetworkMessages();                   //called from main thread
-    void handleInput(const SDL_Event& e) const;      //called from main thread
+    void handleInput(const SDL_Event& e);      //called from main thread
     void render(SDL_Renderer* renderer);
 
     int getLocalPlayerId() const { return localPlayerId; }
@@ -37,9 +37,8 @@ private:
     int cameraX = 0;
     int cameraY = 0;
 
-    //uhhhhh
-    int currentHeldItem = 1; //???
-
+    int currentHeldItem = 1;
+    std::vector<int> tiles = { 1, 2, 3, 4, 5 };
 
     std::mutex incomingMutex;
     std::queue<std::string> incomingMessages;

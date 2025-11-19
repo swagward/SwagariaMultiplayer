@@ -107,7 +107,11 @@ public class World
             return false;
 
         TileType type = tile.getType();
-        return (type == TileType.STONE || type == TileType.DIRT || type == TileType.GRASS);
+        return (type == TileType.STONE ||
+                type == TileType.DIRT ||
+                type == TileType.GRASS ||
+                type == TileType.WOOD_LOG ||
+                type == TileType.WOOD_PLANK);
     }
 
     public int[] findSpawnTile()
