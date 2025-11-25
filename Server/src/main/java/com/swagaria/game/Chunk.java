@@ -10,6 +10,7 @@ public class Chunk
     private final int chunkX;
     private final int chunkY;
     private final Tile[][] tiles; //[x][y] format
+    //TODO: make tile array 3d for background walls and layered tiles
 
     public Chunk(int chunkX, int chunkY)
     {

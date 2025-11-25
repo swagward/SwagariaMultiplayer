@@ -17,7 +17,7 @@ Game::Game() : camera(800, 600)
         std::cerr << "[sdl_ttf] failed to initialize: " << TTF_GetError() << std::endl;
     else
     {
-        font = TTF_OpenFont("C:/Windows/Fonts/arial.ttf", 16);
+        font = TTF_OpenFont("assets/fonts/Andy Bold.ttf", 24);
         if (!font)
             std::cerr << "[sdl_ttf] failed to load font: " << TTF_GetError() << std::endl;
         else
@@ -389,7 +389,7 @@ void Game::drawText(SDL_Renderer* renderer, const std::string& text, const int x
 {
     if (!font) return;
 
-    SDL_Surface* surface = TTF_RenderText_Solid(font, text.c_str(), color);
+    SDL_Surface* surface = TTF_RenderText_Blended(font, text.c_str(), color);
     if (!surface) return;
 
     SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
