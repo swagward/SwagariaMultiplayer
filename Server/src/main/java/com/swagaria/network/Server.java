@@ -52,9 +52,6 @@ public class Server
                 pool.submit(h);
 
                 System.out.println("[Server] Player #" + id + " connected.");
-                System.out.println("check tile at (10,44): " + world.isSolidTile(10,44));
-                System.out.println("check tile at (10,60): " + world.isSolidTile(10,60));
-                System.out.println("check tile at (10,100): " + world.isSolidTile(10,100));
             }
         }
     }

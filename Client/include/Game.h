@@ -6,6 +6,7 @@
 
 #include "Player.h"
 #include "World.h"
+#include "Camera.h"
 
 class Network;
 
@@ -18,8 +19,9 @@ public:
     void setNetwork(Network* n) { network = n; }
     void pushNetworkMessage(const std::string& msg); //called from network thread
     void processNetworkMessages();                   //called from main thread
-    void handleInput(const SDL_Event& e);      //called from main thread
+    void handleInput(const SDL_Event& e);            //called from main thread
     void render(SDL_Renderer* renderer);
+    void update();
 
     int getLocalPlayerId() const { return localPlayerId; }
     void setLocalPlayerId(const int id) { localPlayerId = id; }
@@ -29,19 +31,16 @@ public:
 private:
     Network* network = nullptr;
     std::unique_ptr<World> world;
+    Camera camera = Camera(800, 600);
     TTF_Font* font = nullptr;
 
     int localPlayerId = -1;
     std::unordered_map<int, Player> players;
-
-    int cameraX = 0;
-    int cameraY = 0;
 
     int currentHeldItem = 1;
     std::vector<int> tiles = { 1, 2, 3, 4, 5 };
 
     std::mutex incomingMutex;
     std::queue<std::string> incomingMessages;
-
     void handleOneNetworkMessage(const std::string& msg);
 };

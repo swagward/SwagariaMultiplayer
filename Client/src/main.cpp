@@ -57,6 +57,7 @@ int main(int argc, char* argv[])
 
         //game logic
         game.processNetworkMessages();
+        game.update();
         game.render(renderer);
 
         //fps counting in title bar
