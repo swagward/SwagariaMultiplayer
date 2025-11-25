@@ -296,6 +296,7 @@ void Game::render(SDL_Renderer* renderer)
                     case 3: textureId = "stone"; break;
                     case 4: textureId = "wood_log"; break;
                     case 5: textureId = "wood_plank"; break;
+                    case 6: textureId = "wood_plank_bg"; break;
                     default: //if tile doesn't have a texture or is unknown just draw pink square
                         SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
                         SDL_Rect missingTile { currentScreenX, currentScreenY, scaledTileWidth, scaledTileHeight };
@@ -348,6 +349,7 @@ void Game::render(SDL_Renderer* renderer)
         case 3: textureId = "stone"; blockName = "Stone"; break;
         case 4: textureId = "wood_log"; blockName = "Wood Log"; break;
         case 5: textureId = "wood_plank"; blockName = "Wood Plank"; break;
+        case 6: textureId = "wood_plank_bg"; blockName = "Wood Wall"; break;
     }
 
     const int iconSize = 32;

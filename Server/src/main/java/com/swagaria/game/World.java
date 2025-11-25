@@ -110,8 +110,7 @@ public class World
         return (type == TileType.STONE ||
                 type == TileType.DIRT ||
                 type == TileType.GRASS ||
-                type == TileType.WOOD_LOG ||
-                type == TileType.WOOD_PLANK);
+                type == TileType.WOOD_PLANK); //exclude air, logs and BGs
     }
 
     public int[] findSpawnTile()

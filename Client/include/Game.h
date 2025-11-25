@@ -38,7 +38,7 @@ private:
     std::unordered_map<int, Player> players;
 
     int currentHeldItem = 1;
-    std::vector<int> tiles = { 1, 2, 3, 4, 5 };
+    std::vector<int> tiles = { 1, 2, 3, 4, 5, 6 };
 
     std::mutex incomingMutex;
     std::queue<std::string> incomingMessages;

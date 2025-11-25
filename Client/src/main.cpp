@@ -38,6 +38,7 @@ int main(int argc, char* argv[])
     texManager.loadTexture("stone", "assets/textures/stone.png", renderer);
     texManager.loadTexture("wood_log", "assets/textures/wood_log.png", renderer);
     texManager.loadTexture("wood_plank", "assets/textures/wood_plank.png", renderer);
+    texManager.loadTexture("wood_plank_bg", "assets/textures/wood_plank_bg.png", renderer);
 
     bool isRunning = true;
     SDL_Event event;
