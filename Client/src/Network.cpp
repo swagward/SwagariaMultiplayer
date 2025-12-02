@@ -5,9 +5,9 @@
 Network::Network()
 {
     if (SDLNet_Init() < 0)
-        std::cerr << "[sdl_net] failed to initialize: " << SDLNet_GetError() << std::endl;
+        std::cerr << "[SDL_NET] failed to initialize: " << SDLNet_GetError() << std::endl;
     else
-        std::cout << "[sdl_net] initialized successfully\n";
+        std::cout << "[SDL_NET] Initialized successfully\n";
 }
 
 Network::~Network()
@@ -21,20 +21,20 @@ bool Network::connectToServer(const std::string& host, const int port)
     IPaddress ip;
     if (SDLNet_ResolveHost(&ip, host.c_str(), port) < 0)
     {
-        std::cerr << "[network] failed to resolve host: " << SDLNet_GetError() << std::endl;
+        std::cerr << "[NETWORK] Failed to resolve host: " << SDLNet_GetError() << std::endl;
         return false;
     }
 
     socket = SDLNet_TCP_Open(&ip);
     if (!socket)
     {
-        std::cerr << "[network] failed to connect to " << host << ":" << port
+        std::cerr << "[NETWORK] Failed to connect to " << host << ":" << port
                   << " - " << SDLNet_GetError() << std::endl;
         return false;
     }
 
     connected = true;
-    std::cout << "[network] connected to " << host << ":" << port << std::endl;
+    std::cout << "[NETWORK] Connected to " << host << ":" << port << std::endl;
 
     recvThread = std::thread(&Network::receiveLoop, this);
     sendThread = std::thread(&Network::sendLoop, this);
@@ -71,7 +71,7 @@ void Network::receiveLoop()
         const int bytes = SDLNet_TCP_Recv(socket, buffer, sizeof(buffer) - 1);
         if (bytes <= 0)
         {
-            std::cerr << "[network] connection lost or closed\n";
+            std::cerr << "[NETWORK] Connection lost or closed\n";
             connected = false;
             break;
         }
@@ -113,7 +113,7 @@ void Network::sendLoop(){
 
             if (const int result = SDLNet_TCP_Send(socket, msg.c_str(), len); result < len)
             {
-                std::cerr << "[network] send failed: " << SDLNet_GetError() << std::endl;
+                std::cerr << "[NETWORK] Send failed: " << SDLNet_GetError() << std::endl;
                 connected = false;
             }
         }

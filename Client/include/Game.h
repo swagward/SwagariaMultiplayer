@@ -3,6 +3,8 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <map> // Include map for Player rendering
+#include <vector> // Include vector for tiles
 
 #include "Player.h"
 #include "World.h"
@@ -38,7 +40,16 @@ private:
     std::unordered_map<int, Player> players;
 
     int currentHeldItem = 1;
-    std::vector<int> tiles = { 1, 2, 3, 4, 5, 6 };
+    std::vector<int> tiles = { 1, 2, 3, 4, 5, 6, 7, 8 };
+    //TODO: make adding tiles easier than current process:
+    //adding to java server, setting isSolidTile or not, adding textures + loading, adding to tile vector, adding to switch statements for hotbar and UI render
+
+    bool isFreecamActive = false;
+    float freecamSpeed = 10.0f;
+    const float freecamSpeedStep = 5.0f;
+    const float minFreecamSpeed = 5.0f;
+    const float maxFreecamSpeed = 50.0f;
+    std::map<SDL_Keycode, bool> keysHeld;
 
     std::mutex incomingMutex;
     std::queue<std::string> incomingMessages;

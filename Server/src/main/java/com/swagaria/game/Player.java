@@ -17,11 +17,11 @@ public class Player
     private static final float MAX_FALL_SPEED = 50.0f; //terminal velocity
     private boolean onGround = false;
 
-    //player size (tiles)
+    //player size (in tiles)
     public static final float WIDTH = 1.0f;
     public static final float HEIGHT = 2.0f;
 
-    //player reach (for tile modification
+    //player reach (for tile modification)
     public static final float MAX_REACH_DISTANCE = 8000.0f;
     public static final float MAX_REACH_DISTANCE_SQ = MAX_REACH_DISTANCE * MAX_REACH_DISTANCE;
 

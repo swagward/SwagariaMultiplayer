@@ -26,7 +26,7 @@ bool TextureManager::loadTexture(const std::string& id, const std::string& path,
     SDL_Surface* temp = IMG_Load(path.c_str());
     if (!temp)
     {
-        std::cerr << "Failed to load " << path << std::endl;
+        std::cerr << "[SDL_IMG] Failed to load " << path << std::endl;
         return false;
     }
 
@@ -35,12 +35,12 @@ bool TextureManager::loadTexture(const std::string& id, const std::string& path,
 
     if (!texture)
     {
-        std::cerr << "Failed to create texture" << std::endl;
+        std::cerr << "[SDL_IMG] Failed to create texture" << std::endl;
         return false;
     }
 
     textureMap[id] = texture;
-    std::cout << "Texture " << id << " loaded" << std::endl;
+    std::cout << "[SDL_IMG] Texture " << id << " loaded" << std::endl;
     return true;
 }
 
@@ -51,8 +51,7 @@ SDL_Texture* TextureManager::getTexture(const std::string& id) const
     return nullptr;
 }
 
-//ts so buns 😭😭😭
-void TextureManager::draw(SDL_Renderer* renderer, const std::string& id, int x, int y, int w, int h) const
+void TextureManager::draw(SDL_Renderer* renderer, const std::string& id, const int x, const int y, const int w, const int h) const
 {
     SDL_Texture* texture = getTexture(id);
     if (!texture)

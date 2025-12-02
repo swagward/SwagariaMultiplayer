@@ -6,6 +6,7 @@ Camera::Camera(const int screenWidth, const int screenHeight)
 
 void Camera::update()
 {
+    //smoothly move camera x/y to the target x/y
     x += (targetX - x) * lerpFactor;
     y += (targetY - y) * lerpFactor;
 }
@@ -14,6 +15,12 @@ void Camera::setTarget(const float targetWorldX, const float targetWorldY)
 {
     targetX = (screenW / 2.0f) - (targetWorldX * zoom);
     targetY = (screenH / 2.0f) - (targetWorldY * zoom);
+}
+
+void Camera::setScreenOffsetTarget(const float targetScreenX, const float targetScreenY)
+{
+    targetX = targetScreenX;
+    targetY = targetScreenY;
 }
 
 void Camera::handleZoom(const int wheelDelta)

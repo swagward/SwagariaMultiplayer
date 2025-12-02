@@ -2,7 +2,8 @@ package com.swagaria.game;
 
 import com.swagaria.data.TerrainConfig;
 import com.swagaria.data.Tile;
-import com.swagaria.data.TileType;
+import com.swagaria.data.TileDefinition; // Import the new definition registry
+import com.swagaria.data.components.CollisionComponent; // Import the component for checks
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,7 +57,7 @@ public class World
         if (worldX < 0 || worldY < 0 ||
                 worldX >= TerrainConfig.WORLD_WIDTH ||
                 worldY >= TerrainConfig.WORLD_HEIGHT)
-            return null; //out of bounds, not a valid chunk
+            return null;
 
         int realY = TerrainConfig.WORLD_HEIGHT - 1 - worldY;
 
@@ -73,12 +74,12 @@ public class World
         return chunk.getTile(localX, localY);
     }
 
-    public boolean setTileAt(int worldX, int worldY, int tileTypeOrdinal)
+    public boolean setTileAt(int worldX, int worldY, int tileTypeId)
     {
         if (worldX < 0 || worldY < 0 ||
                 worldX >= TerrainConfig.WORLD_WIDTH ||
                 worldY >= TerrainConfig.WORLD_HEIGHT)
-            return false; //out of world bounds, dont set tile
+            return false;
 
         int realY = TerrainConfig.WORLD_HEIGHT - 1 - worldY;
 
@@ -92,25 +93,32 @@ public class World
         int localX = worldX % TerrainConfig.CHUNK_SIZE;
         int localY = realY % TerrainConfig.CHUNK_SIZE;
 
-        //make sure tile type has actual ID
-        if (tileTypeOrdinal < 0 || tileTypeOrdinal >= TileType.values().length)
+        // Ensure tile type ID is valid before setting
+        if (TileDefinition.getDefinition(tileTypeId).typeID == TileDefinition.ID_AIR && tileTypeId != TileDefinition.ID_AIR)
             return false;
 
-        chunk.setTile(localX, localY, tileTypeOrdinal);
+        chunk.setTile(localX, localY, tileTypeId);
         return true;
     }
 
+    /**
+     * Checks if a tile is solid by looking for the CollisionComponent in its definition.
+     */
     public boolean isSolidTile(int worldX, int worldY)
     {
         Tile tile = getTileAt(worldX, worldY);
-        if (tile == null || tile.getType() == TileType.AIR)
+        if (tile == null || tile.getTypeId() == TileDefinition.ID_AIR)
             return false;
 
-        TileType type = tile.getType();
-        return (type == TileType.STONE ||
-                type == TileType.DIRT ||
-                type == TileType.GRASS ||
-                type == TileType.WOOD_PLANK); //exclude air, logs and BGs
+        TileDefinition definition = tile.getDefinition();
+
+        // Use the Component Pattern to check for collision property
+        if (definition.hasComponent(CollisionComponent.class))
+        {
+            return definition.getComponent(CollisionComponent.class).blocksMovement;
+        }
+
+        return false; // Default: if a tile has no collision component, it is not solid
     }
 
     public int[] findSpawnTile()

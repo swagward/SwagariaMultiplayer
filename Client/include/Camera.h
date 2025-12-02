@@ -8,6 +8,7 @@ public:
 
     void update();
     void setTarget(float targetWorldX, float targetWorldY);
+    void setScreenOffsetTarget(float targetScreenX, float targetScreenY);
     void handleZoom(int wheelDelta);
 
     int getX() const { return static_cast<int>(x); }
@@ -16,6 +17,8 @@ public:
     float getPreciseY() const { return y; }
 
     float getZoom() const { return zoom; }
+    float getTargetX() const { return targetX; }
+    float getTargetY() const { return targetY; }
 
 private:
     float x = 0.0f;
