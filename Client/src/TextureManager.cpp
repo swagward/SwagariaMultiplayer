@@ -3,6 +3,8 @@
 #include <iostream>
 #include <ostream>
 
+//TODO: Need to work on allowing textures to animate for player.
+
 TextureManager& TextureManager::getInstance()
 {
     static TextureManager instance;

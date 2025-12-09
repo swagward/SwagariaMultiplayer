@@ -3,6 +3,14 @@
 #include "../include/Network.h"
 #include "../include/TextureManager.h"
 
+//TODO: Try adding animations, but not just for player,
+//maybe for tile breaking or placing where it slowly fades into existence or something like that.
+//https://www.youtube.com/watch?v=Fy0aCDmgnxg
+//https://github.com/AlmasB/FXGL/blob/dev/fxgl-core/src/main/kotlin/com/almasb/fxgl/animation/Interpolators.kt
+
+//Also, try adding a placement display on the mouse, so you know where you're about to place the block.
+//Placement display needs to follow grid pattern AND have scale/fade animation as well.
+
 int main(int argc, char* argv[])
 {
     if (SDL_Init(SDL_INIT_VIDEO) < 0)

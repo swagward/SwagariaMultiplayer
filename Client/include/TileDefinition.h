@@ -1,5 +1,11 @@
 #pragma once
 
+//Eventually store everything in an ItemID class, TileID class, etc.
+//TileID will mimic ItemID but with an offset, like:
+//ItemID.Grass = 1;
+//TileID.Grass = 1 + 1000;
+//This will make it easier to add new tiles and items, keeping them separate fom each other.
+
 namespace TileDefinition
 {
     constexpr int ID_AIR = 0;

@@ -2,17 +2,28 @@
 #include "../include/World.h"
 #include <algorithm>
 
+#include "../include/TileDefinition.h"
+
+//TODO: Instead of having the inventory client side, it NEEDS to be server side.
+//It'll keep track of all the data we store in the inventory (ID's + quantity) with an array
+//but that's it, since it doesnt need to know about where each item is in the array.
+//The client will receive messages whenever an item changes,
+//I.E: you have dirt with a quantity of 0 it removes it, or if a new item is added to the array
+
 Inventory::Inventory()
 {
     slots.resize(INVENTORY_SIZE);
 
     //test data
     //need to stop using bytes for ID representation because itll get confusing later on when adding different items.
-    slots[0] = { 1, 99 };
-    slots[1] = { 5, 25 };
-    slots[2] = { 7, 25 };
-    slots[10] = { 6, 1 };
-    slots[11] = { 9, 57 };
+    slots[0] = { TileDefinition::ID_GRASS, 1 };
+    slots[1] = { TileDefinition::ID_DIRT, 1 };
+    slots[2] = { TileDefinition::ID_STONE, 1 };
+    slots[3] = { TileDefinition::ID_WOOD_PLANK, 1 };
+    slots[4] = { TileDefinition::ID_WOOD_LOG, 1 };
+    slots[5] = { TileDefinition::ID_TORCH, 1 };
+    slots[7] = { TileDefinition::ID_WOOD_PLANK_BG, 1 };
+    slots[8] = { TileDefinition::ID_STONE_BG, 1 };
 
     //TODO: add tools for player to start with in slot 0, 1, 2
 }

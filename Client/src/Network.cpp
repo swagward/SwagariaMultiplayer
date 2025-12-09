@@ -2,6 +2,8 @@
 #include "../include/Game.h"
 #include <algorithm>
 
+//TODO: Add in game text that displays when a client leaves or joins.
+//Have it fade away slowly so screen isn't cluttered
 Network::Network()
 {
     if (SDLNet_Init() < 0)

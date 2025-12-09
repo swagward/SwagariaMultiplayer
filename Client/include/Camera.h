@@ -3,7 +3,7 @@
 class Camera
 {
 public:
-    //TODO: dynamically update screenWidth/Height if the window size changes.
+    //TODO: Allow the window size to be changed, in game camera should resize so that nothing visually changes, with tile scaling.
     Camera(int screenWidth, int screenHeight);
 
     void update();
