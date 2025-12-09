@@ -3,12 +3,13 @@
 #include <mutex>
 #include <queue>
 #include <thread>
-#include <map> // Include map for Player rendering
-#include <vector> // Include vector for tiles
+#include <map>
+#include <vector>
 
 #include "Player.h"
 #include "World.h"
 #include "Camera.h"
+#include "Inventory.h"
 
 class Network;
 
@@ -23,6 +24,7 @@ public:
     void processNetworkMessages();                   //called from main thread
     void handleInput(const SDL_Event& e);            //called from main thread
     void render(SDL_Renderer* renderer);
+    void renderInventory(SDL_Renderer* renderer, int winW, int winH) const;
     void update();
 
     int getLocalPlayerId() const { return localPlayerId; }
@@ -39,10 +41,8 @@ private:
     int localPlayerId = -1;
     std::unordered_map<int, Player> players;
 
-    int currentHeldItem = 1;
-    std::vector<int> tiles = { 1, 2, 3, 4, 5, 6, 7, 8 };
-    //TODO: make adding tiles easier than current process:
-    //adding to java server, setting isSolidTile or not, adding textures + loading, adding to tile vector, adding to switch statements for hotbar and UI render
+    Inventory inventory;
+    bool isInventoryOpen = false;
 
     bool isFreecamActive = false;
     float freecamSpeed = 10.0f;

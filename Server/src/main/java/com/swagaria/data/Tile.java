@@ -3,7 +3,7 @@ package com.swagaria.data;
 public class Tile
 {
     private int typeId;
-    private float damage; // New: Current damage accumulated (0.0 to MaxDurability)
+    private float damage;
 
     public Tile(int typeId)
     {
@@ -19,15 +19,12 @@ public class Tile
     public void setTypeId(int typeId)
     {
         this.typeId = typeId;
-        this.damage = 0.0f; // Reset damage when type changes
+        this.damage = 0.0f;
     }
 
     public float getDamage() { return damage; }
     public void setDamage(float damage) { this.damage = damage; }
 
-    /**
-     * Helper to get the static definition for this instance.
-     */
     public TileDefinition getDefinition()
     {
         return TileDefinition.getDefinition(typeId);

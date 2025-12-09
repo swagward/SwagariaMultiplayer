@@ -2,8 +2,9 @@ package com.swagaria.game;
 
 import com.swagaria.data.TerrainConfig;
 import com.swagaria.data.Tile;
-import com.swagaria.data.TileDefinition; // Import the new definition registry
-import com.swagaria.data.components.CollisionComponent; // Import the component for checks
+import com.swagaria.data.TileDefinition;
+import com.swagaria.data.TileLayer;
+import com.swagaria.data.components.CollisionComponent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,12 +38,9 @@ public class World
     {
         List<Chunk> list = new ArrayList<>();
         for (int y = 0; y < TerrainConfig.WORLD_CHUNKS_Y; y++)
-        {
             for (int x = 0; x < TerrainConfig.WORLD_CHUNKS_X; x++)
-            {
                 list.add(chunks[x][y]);
-            }
-        }
+
         return list;
     }
 
@@ -52,7 +50,7 @@ public class World
         return chunks[cx][cy];
     }
 
-    public Tile getTileAt(int worldX, int worldY)
+    public Tile getTileAt(int worldX, int worldY, int layer)
     {
         if (worldX < 0 || worldY < 0 ||
                 worldX >= TerrainConfig.WORLD_WIDTH ||
@@ -71,14 +69,15 @@ public class World
         int localX = worldX % TerrainConfig.CHUNK_SIZE;
         int localY = realY % TerrainConfig.CHUNK_SIZE;
 
-        return chunk.getTile(localX, localY);
+        return chunk.getTile(localX, localY, layer);
     }
 
-    public boolean setTileAt(int worldX, int worldY, int tileTypeId)
+    public boolean setTileAt(int worldX, int worldY, int layer, int tileTypeId)
     {
         if (worldX < 0 || worldY < 0 ||
                 worldX >= TerrainConfig.WORLD_WIDTH ||
-                worldY >= TerrainConfig.WORLD_HEIGHT)
+                worldY >= TerrainConfig.WORLD_HEIGHT ||
+                layer < 0 || layer >= TileLayer.NUM_LAYERS)
             return false;
 
         int realY = TerrainConfig.WORLD_HEIGHT - 1 - worldY;
@@ -93,32 +92,25 @@ public class World
         int localX = worldX % TerrainConfig.CHUNK_SIZE;
         int localY = realY % TerrainConfig.CHUNK_SIZE;
 
-        // Ensure tile type ID is valid before setting
         if (TileDefinition.getDefinition(tileTypeId).typeID == TileDefinition.ID_AIR && tileTypeId != TileDefinition.ID_AIR)
             return false;
 
-        chunk.setTile(localX, localY, tileTypeId);
+        chunk.setTile(localX, localY, layer, tileTypeId);
         return true;
     }
 
-    /**
-     * Checks if a tile is solid by looking for the CollisionComponent in its definition.
-     */
     public boolean isSolidTile(int worldX, int worldY)
     {
-        Tile tile = getTileAt(worldX, worldY);
+        Tile tile = getTileAt(worldX, worldY, TileLayer.FOREGROUND);
         if (tile == null || tile.getTypeId() == TileDefinition.ID_AIR)
             return false;
 
         TileDefinition definition = tile.getDefinition();
 
-        // Use the Component Pattern to check for collision property
         if (definition.hasComponent(CollisionComponent.class))
-        {
             return definition.getComponent(CollisionComponent.class).blocksMovement;
-        }
 
-        return false; // Default: if a tile has no collision component, it is not solid
+        return false; //default to no collision
     }
 
     public int[] findSpawnTile()

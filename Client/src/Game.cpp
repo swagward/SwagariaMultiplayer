@@ -1,6 +1,7 @@
 #include "../include/Game.h"
 #include "../include/Network.h"
 #include "../include/TextureManager.h"
+#include "../include/TileDefinition.h"
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -113,13 +114,26 @@ void Game::handleOneNetworkMessage(const std::string& msg)
         int chunkY = std::stoi(parts[2]);
         auto chunk = std::make_unique<Chunk>(chunkX, chunkY);
 
-        constexpr int expectedTileCount = Chunk::SIZE * Chunk::SIZE;
-        for (int i = 0; i < expectedTileCount; i++)
+        constexpr int tilesPerLayer = Chunk::SIZE * Chunk::SIZE;
+        int tileIndexOffset = 3; //skip CHUNK_DATA, chunkX and chunkY
+
+        for (int layer = 0; layer < TileLayer::NUM_LAYERS; layer++)
         {
-            const int type = std::stoi(parts[3 + i]);
-            const int x = i % Chunk::SIZE;
-            const int y = i / Chunk::SIZE;
-            chunk->setTile(x, y, type);
+            for (int i = 0; i < tilesPerLayer; i++)
+            {
+                if (tileIndexOffset + i >= parts.size())
+                {
+                    std::cerr << "[ERROR] CHUNK_DATA message truncated. Missing tile data.\n";
+                    return;
+                }
+
+                const int type = std::stoi(parts[tileIndexOffset + i]);
+                const int x = i % Chunk::SIZE;
+                const int y = i / Chunk::SIZE;
+
+                chunk->setTile(x, y, layer, type);
+            }
+            tileIndexOffset += tilesPerLayer;
         }
 
         world->addChunk(std::move(chunk));
@@ -127,12 +141,16 @@ void Game::handleOneNetworkMessage(const std::string& msg)
     else if (cmd == "UPDATE_TILE")
     {
         if (!world) return;
+        if (parts.size() < 5) return;
 
-        //TODO: make proper world to tile conversion function
         //coordinate conversions to get the tile the mouse is hovering over
         const int worldX = std::stoi(parts[1]);
         const int topDownWorldY = std::stoi(parts[2]);
         const int newTileType = std::stoi(parts[3]);
+        const int layerIndex = std::stoi(parts[4]);
+
+        if (layerIndex < 0 || layerIndex >= TileLayer::NUM_LAYERS) return;
+
         constexpr int worldHeightInTiles = World::WORLD_HEIGHT_IN_CHUNKS * Chunk::SIZE;
         const int bottomUpWorldY = worldHeightInTiles - 1 - topDownWorldY;
         const int chunkX = static_cast<int>(std::floor(static_cast<float>(worldX) / Chunk::SIZE));
@@ -142,7 +160,16 @@ void Game::handleOneNetworkMessage(const std::string& msg)
         const int tileY_BottomUp = (bottomUpWorldY % Chunk::SIZE + Chunk::SIZE) % Chunk::SIZE;
 
         if (Chunk* chunk = world->getChunk(chunkX, fixedChunkY))
-            chunk->setTile(tileX, tileY_BottomUp, newTileType);
+            chunk->setTile(tileX, tileY_BottomUp, layerIndex, newTileType);
+    }
+    else if (cmd == "UPDATE_SLOT")
+    {
+        if (parts.size() < 4) return;
+        const int slotIndex = std::stoi(parts[1]);
+        const int itemID = std::stoi(parts[2]);
+        const int quantity = std::stoi(parts[3]);
+
+        inventory.updateSlot(slotIndex, itemID, quantity);
     }
 }
 
@@ -150,7 +177,12 @@ void Game::handleInput(const SDL_Event& e)
 {
     if (localPlayerId == -1)
         return;
-
+    //inventory toggle
+    if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_e && !e.key.repeat)
+    {
+        isInventoryOpen = !isInventoryOpen;
+        return;
+    }
     //freecam toggle
     if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_F1 && !e.key.repeat)
     {
@@ -160,7 +192,12 @@ void Game::handleInput(const SDL_Event& e)
             //when active, anchor the camera's target to its exact screen position on the x/y
             camera.setScreenOffsetTarget(camera.getPreciseX(), camera.getPreciseY());
     }
-
+    //inventory interaction
+    if (isInventoryOpen)
+    {
+        //TODO: add click/drag logic later
+        //maybe make a server-side thing instead??
+    }
     //handle movement
     if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP)
     {
@@ -199,37 +236,67 @@ void Game::handleInput(const SDL_Event& e)
             default: ;
         }
     }
-
     //tile interaction (when freecam is disabled)
     else if (e.type == SDL_MOUSEBUTTONDOWN && !isFreecamActive)
     {
         int tileToSend = -1;
-        if (e.button.button == SDL_BUTTON_LEFT)         //left click to break (place air)
-            tileToSend = 0;
-        else if (e.button.button == SDL_BUTTON_RIGHT)   //right click to place (any tile)
-            tileToSend = currentHeldItem;
+        int layerToSend = -1;
+        const int currentHeldItem = inventory.getCurrentHeldItem();
 
+        //helper to get the layer based on tile ID
+        auto determineLayer = [&](const int itemID) -> int
+        {
+            if (itemID == TileDefinition::ID_WOOD_PLANK_BG || itemID == TileDefinition::ID_STONE_BG)
+                return TileLayer::BACKGROUND;
+            return TileLayer::FOREGROUND;
+        };
+
+        if (e.button.button == SDL_BUTTON_LEFT) //break (place air)
+        {
+            std::cout << "[CLICK DEBUG] Type: LEFT CLICK (BREAK)" << std::endl;
+            //prefer to break foreground
+            tileToSend = TileDefinition::ID_AIR;
+            layerToSend = TileLayer::FOREGROUND;
+        }
+        else if (e.button.button == SDL_BUTTON_RIGHT) //place tile
+        {
+            std::cout << "[CLICK DEBUG] Type: RIGHT CLICK (PLACE)" << std::endl;
+            if (currentHeldItem != TileDefinition::ID_AIR)
+            {
+                tileToSend = currentHeldItem;
+                layerToSend = determineLayer(currentHeldItem);
+
+            }
+        }
         if (tileToSend == -1)
-            return; //discard because value unchanged
+        {
+            std::cout << "[CLIENT DEBUG] tileToSend is -1. Message not queued." << std::endl;
+            return;
+        }
 
-        //get specific tile in world with zoom accounted for
         const float zoom = camera.getZoom();
+        //get mouse position in world space
         const float mouseWorldOffsetScaledX = static_cast<float>(e.button.x) - camera.getPreciseX();
         const float mouseWorldOffsetScaledY = static_cast<float>(e.button.y) - camera.getPreciseY();
         const float mouseWorldX = mouseWorldOffsetScaledX / zoom;
         const float mouseWorldY = mouseWorldOffsetScaledY / zoom;
+
+        //convert pixel coord to tile coord
         const int tileX = static_cast<int>(std::floor(mouseWorldX / World::TILE_PX_SIZE));
         const int tileY = static_cast<int>(std::floor(mouseWorldY / World::TILE_PX_SIZE));
 
-        //conversion for sdl2 & java Y origin
+        //conversion for sdl2 (top-down) & java/server Y origin (bottom-up)
         constexpr int worldHeightInTiles = World::WORLD_HEIGHT_IN_CHUNKS * Chunk::SIZE;
         const int fixedTileY = worldHeightInTiles - 1 - tileY;
 
         std::ostringstream oss;
-        oss << "SET_TILE," << tileX << "," << fixedTileY << "," << tileToSend;
+        oss << "SET_TILE," << tileX << "," << fixedTileY << "," << tileToSend << "," << layerToSend;
+
+        const std::string message = oss.str();
+        std::cout << "[CLIENT DEBUG] Queuing network message: " << message << std::endl;
 
         if (network)
-            network->queueMessage(oss.str());
+            network->queueMessage(message);
     }
     //scrollwheel cycle for tiles/speed/zoom
     else if (e.type == SDL_MOUSEWHEEL)
@@ -247,29 +314,82 @@ void Game::handleInput(const SDL_Event& e)
 
             freecamSpeed = std::clamp(newSpeed, minFreecamSpeed, maxFreecamSpeed);
         }
-        else
+        else if (!isInventoryOpen)
         {
-            //cycle hotbar
-            auto index = std::find(tiles.begin(), tiles.end(),currentHeldItem);
-            if (index == tiles.end())
-                index = tiles.begin(); //reset if index is greater than tiles array size
+            int currentIndex = inventory.selectedHotbarIndex;
+            if (e.wheel.y < 0)
+                currentIndex = (currentIndex + 1) % HOTBAR_SIZE;
+            else if (e.wheel.y > 0)
+                currentIndex = (currentIndex - 1 + HOTBAR_SIZE) % HOTBAR_SIZE;
 
-            int currentIndex = std::distance(tiles.begin(), index);
-            if (e.wheel.y > 0)
-                currentIndex = (currentIndex + 1) % tiles.size();
-            else if (e.wheel.y < 0)
-                currentIndex = (currentIndex - 1 + tiles.size()) % tiles.size();
-
-            currentHeldItem = tiles[currentIndex];
+            inventory.selectedHotbarIndex = currentIndex;
         }
     }
+    else if (e.type == SDL_KEYDOWN && e.key.keysym.sym >= SDLK_1 && e.key.keysym.sym <= SDLK_9 && !isInventoryOpen)
+        inventory.selectedHotbarIndex = (e.key.keysym.sym - SDLK_1);
+    else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_0 && !isInventoryOpen)
+        inventory.selectedHotbarIndex = 0;
 }
+
+void Game::renderInventory(SDL_Renderer* renderer, const int winW, const int winH) const
+{
+    const TextureManager& texManager = TextureManager::getInstance();
+    constexpr SDL_Color textColor = { 255, 255, 255, 255 };
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+    int maxSlot = HOTBAR_SIZE;
+    if (isInventoryOpen)
+        maxSlot = INVENTORY_SIZE;
+
+    for (int i = 0; i < maxSlot; i++)
+    {
+        int x, y;
+        Inventory::getSlotScreenPosition(i, x, y, winW, winH);
+        const auto& slot = inventory.slots[i];
+
+        SDL_Rect slotRect = { x, y, SLOT_SIZE, SLOT_SIZE };
+        if (i < HOTBAR_SIZE && i == inventory.selectedHotbarIndex)
+            SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255); //selected slot will be yellow
+        else
+            SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255); //else be dark grey
+
+        SDL_RenderFillRect(renderer, &slotRect);
+
+        SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255); //light grey border around slots
+        SDL_RenderDrawRect(renderer, &slotRect);
+
+        //adding textures to filled slots
+        if (!slot.isEmpty())
+        {
+            texManager.draw(renderer, slot.getTextureID(), x, y, SLOT_SIZE, SLOT_SIZE);
+
+            std::string itemQuantity = std::to_string(slot.quantity);
+            drawText(renderer, itemQuantity, x + SLOT_SIZE - static_cast<int>(itemQuantity.length()) * 10, y + SLOT_SIZE - 25, textColor);
+        }
+    }
+
+    if (!inventory.mouseHeldItem.isEmpty())
+    {
+        //get mouse position and render block image to it
+        int mouseX, mouseY;
+        SDL_GetMouseState(&mouseX, &mouseY);
+
+        const auto& heldSlot = inventory.mouseHeldItem;
+        texManager.draw(renderer, heldSlot.getTextureID(), mouseX - SLOT_SIZE / 2, mouseY - SLOT_SIZE / 2, SLOT_SIZE, SLOT_SIZE);
+
+        std::string heldItemQuantity = std::to_string(heldSlot.quantity);
+        drawText(renderer, heldItemQuantity, mouseX - static_cast<int>(heldItemQuantity.length()) * 10, mouseY + SLOT_SIZE / 2 - 25, textColor);
+    }
+}
+
+
 
 void Game::render(SDL_Renderer* renderer)
 {
     const TextureManager& texManager = TextureManager::getInstance();
     std::string textureId;
-    SDL_SetRenderDrawColor(renderer, 30, 160, 230, 255); //basic sky backdrop (replace with parallax png later)
+    SDL_SetRenderDrawColor(renderer, 30, 160, 230, 255);
     SDL_RenderClear(renderer);
 
     if (!world) return;
@@ -281,53 +401,12 @@ void Game::render(SDL_Renderer* renderer)
     const float cameraY = camera.getPreciseY();
     const float zoom = camera.getZoom();
 
-    //get the unscaled camera viewport
-    const float viewLeftPix = (0.0f - cameraX) / zoom;
-    const float viewTopPix = (0.0f - cameraY) / zoom;
-    const float viewRightPix = (static_cast<float>(winW) - cameraX) / zoom;
-    const float viewBottomPix = (static_cast<float>(winH) - cameraY) / zoom;
-
     float cullLeftPix, cullTopPix, cullRightPix, cullBottomPix;
+    cullLeftPix = -cameraX / zoom;
+    cullTopPix = -cameraY / zoom;
+    cullRightPix = (winW - cameraX) / zoom;
+    cullBottomPix = (winH - cameraY) / zoom;
 
-    //define the culling bounds based on players position and camera zoom
-    if (localPlayerId != -1 && players.count(localPlayerId))
-    {
-        const auto& p = players[localPlayerId];
-
-        const int playerTileX = static_cast<int>(p.x);
-        const int playerTileY_Up = static_cast<int>(p.y);
-        constexpr int worldHeightInTiles = World::WORLD_HEIGHT_IN_CHUNKS * Chunk::SIZE;
-        const int playerTileY_Down = worldHeightInTiles - 1 - playerTileY_Up;
-        constexpr float TILE_PX_SIZE = static_cast<float>(World::TILE_PX_SIZE);
-        const float playerCentreX_Pix = (static_cast<float>(playerTileX) + 0.5f) * TILE_PX_SIZE;
-        const float playerCentreY_Pix = (static_cast<float>(playerTileY_Down) + 0.5f) * TILE_PX_SIZE;
-        const float CULL_RADIUS_PX = 2500.0f;
-
-        const float playerCullLeftPix = playerCentreX_Pix - CULL_RADIUS_PX;
-        const float playerCullRightPix = playerCentreX_Pix + CULL_RADIUS_PX;
-        const float playerCullTopPix = playerCentreY_Pix - CULL_RADIUS_PX;
-        const float playerCullBottomPix = playerCentreY_Pix + CULL_RADIUS_PX;
-
-        //the final rendering bounds are the INTERSECTION of the Camera View and the Player Culling Area
-        //this means:
-        //A) only draw what's on screen (cullLeftPix > viewLeftPix)
-        //B) only draw what's near the player (cullLeftPix > playerCullLeftPix)
-        cullLeftPix = std::max(viewLeftPix, playerCullLeftPix);
-        cullTopPix = std::max(viewTopPix, playerCullTopPix);
-        cullRightPix = std::min(viewRightPix, playerCullRightPix);
-        cullBottomPix = std::min(viewBottomPix, playerCullBottomPix);
-    }
-    else
-    {
-        //if no player is spawned then just fall back to simple camera frustum culling idk
-        cullLeftPix = viewLeftPix;
-        cullTopPix = viewTopPix;
-        cullRightPix = viewRightPix;
-        cullBottomPix = viewBottomPix;
-    }
-
-
-    //get visible chunks based on the culling bounds
     constexpr float TILE_PX_SIZE = static_cast<float>(World::TILE_PX_SIZE);
     constexpr float CHUNK_SIZE_PX = static_cast<float>(Chunk::SIZE * World::TILE_PX_SIZE);
     int minChunkX = static_cast<int>(std::floor(cullLeftPix / CHUNK_SIZE_PX));
@@ -342,125 +421,114 @@ void Game::render(SDL_Renderer* renderer)
     int startChunkY_Down = std::clamp(minChunkY_Down, 0, worldChunksY - 1);
     int endChunkY_Down = std::clamp(maxChunkY_Down, 0, worldChunksY - 1);
 
-    //iterate through visible chunks
-    for (int cx = startChunkX; cx <= endChunkX; ++cx)
+    for (int layer = TileLayer::NUM_LAYERS - 1; layer >= 0; --layer)
     {
-        //convert the render y index
-        for (int cy_Down = startChunkY_Down; cy_Down <= endChunkY_Down; ++cy_Down)
+        //iterate through visible chunks
+        for (int cx = startChunkX; cx <= endChunkX; ++cx)
         {
-            const int chunkY_BottomUp = worldChunksY - 1 - cy_Down;
-            Chunk* chunk = world->getChunk(cx, chunkY_BottomUp);
-            if (!chunk) continue;
-
-            const float chunkWorldX = static_cast<float>(cx * CHUNK_SIZE_PX);
-            const float chunkWorldY = static_cast<float>(cy_Down * CHUNK_SIZE_PX);
-
-            //clamp x and y bounds
-            int startTileX = std::max(0, static_cast<int>(std::floor((cullLeftPix - chunkWorldX) / TILE_PX_SIZE)));
-            int startTileY_Down = std::max(0, static_cast<int>(std::floor((cullTopPix - chunkWorldY) / TILE_PX_SIZE)));
-            int endTileX = std::min(Chunk::SIZE - 1, static_cast<int>(std::ceil((cullRightPix - chunkWorldX) / TILE_PX_SIZE)) - 1);
-            int endTileY_Down = std::min(Chunk::SIZE - 1, static_cast<int>(std::ceil((cullBottomPix - chunkWorldY) / TILE_PX_SIZE)) - 1);
-
-            //iterate through the visible tiles now
-            for (int y_Down = startTileY_Down; y_Down <= endTileY_Down; ++y_Down)
+            //convert the render y index
+            for (int cy_Down = startChunkY_Down; cy_Down <= endChunkY_Down; ++cy_Down)
             {
-                //convert top-down Y index to bottom-up
-                const int y_Storage = Chunk::SIZE - 1 - y_Down;
+                const int chunkY_BottomUp = worldChunksY - 1 - cy_Down;
+                Chunk* chunk = world->getChunk(cx, chunkY_BottomUp);
+                if (!chunk) continue;
 
-                for (int x_Local = startTileX; x_Local <= endTileX; ++x_Local)
+                const float chunkWorldX = cx * CHUNK_SIZE_PX;
+                const float chunkWorldY = cy_Down * CHUNK_SIZE_PX;
+
+                //clamp x and y bounds
+                int startTileX = std::max(0, static_cast<int>(std::floor((cullLeftPix - chunkWorldX) / TILE_PX_SIZE)));
+                int startTileY_Down = std::max(0, static_cast<int>(std::floor((cullTopPix - chunkWorldY) / TILE_PX_SIZE)));
+                int endTileX = std::min(Chunk::SIZE - 1, static_cast<int>(std::ceil((cullRightPix - chunkWorldX) / TILE_PX_SIZE)) - 1);
+                int endTileY_Down = std::min(Chunk::SIZE - 1, static_cast<int>(std::ceil((cullBottomPix - chunkWorldY) / TILE_PX_SIZE)) - 1);
+
+                //iterate through the visible tiles
+                for (int y_Down = startTileY_Down; y_Down <= endTileY_Down; ++y_Down)
                 {
-                    auto& [type] = chunk->tiles[y_Storage][x_Local];
+                    //convert top-down Y index to bottom-up
+                    const int y_Storage = Chunk::SIZE - 1 - y_Down;
 
-                    //render world properly based on zoom + remove seams when zoom is floating point value
-                    const float currentUnscaledWorldX = chunkWorldX + x_Local * TILE_PX_SIZE;
-                    const float currentUnscaledWorldY = chunkWorldY + y_Down * TILE_PX_SIZE;
-                    const float nextUnscaledWorldX = chunkWorldX + (x_Local + 1) * TILE_PX_SIZE;
-                    const float nextUnscaledWorldY = chunkWorldY + (y_Down + 1) * TILE_PX_SIZE;
-
-                    const int currentScreenX = static_cast<int>(std::floor(currentUnscaledWorldX * zoom + cameraX));
-                    const int currentScreenY = static_cast<int>(std::floor(currentUnscaledWorldY * zoom + cameraY));
-                    const int nextScreenX = static_cast<int>(std::floor(nextUnscaledWorldX * zoom + cameraX));
-                    const int nextScreenY = static_cast<int>(std::floor(nextUnscaledWorldY * zoom + cameraY));
-
-                    const int scaledTileWidth = nextScreenX - currentScreenX;
-                    const int scaledTileHeight = nextScreenY - currentScreenY;
-
-                    if (type == 0) continue; //air
-                    if (scaledTileWidth <= 0 || scaledTileHeight <= 0) continue;
-
-                    switch (type)
+                    for (int x_Local = startTileX; x_Local <= endTileX; ++x_Local)
                     {
-                    case 1: textureId = "grass"; break;
-                    case 2: textureId = "dirt"; break;
-                    case 3: textureId = "stone"; break;
-                    case 4: textureId = "wood_log"; break;
-                    case 5: textureId = "torch"; break;
-                    case 6: textureId = "wood_plank"; break;
-                    case 7: textureId = "wood_plank_bg"; break;
-                    case 8: textureId = "stone_bg"; break;
-                    default: textureId = "missing_texture"; break;
-                    }
+                        auto& [type] = chunk->tiles[y_Storage][x_Local][layer];
 
-                    texManager.draw(renderer, textureId, currentScreenX, currentScreenY, scaledTileWidth, scaledTileHeight);
+                        //render world properly based on zoom + remove seams when zoom is floating point value
+                        const float currentUnscaledWorldX = chunkWorldX + x_Local * TILE_PX_SIZE;
+                        const float currentUnscaledWorldY = chunkWorldY + y_Down * TILE_PX_SIZE;
+                        const float nextUnscaledWorldX = chunkWorldX + (x_Local + 1) * TILE_PX_SIZE;
+                        const float nextUnscaledWorldY = chunkWorldY + (y_Down + 1) * TILE_PX_SIZE;
+
+                        const int currentScreenX = static_cast<int>(std::floor(currentUnscaledWorldX * zoom + cameraX));
+                        const int currentScreenY = static_cast<int>(std::floor(currentUnscaledWorldY * zoom + cameraY));
+                        const int nextScreenX = static_cast<int>(std::floor(nextUnscaledWorldX * zoom + cameraX));
+                        const int nextScreenY = static_cast<int>(std::floor(nextUnscaledWorldY * zoom + cameraY));
+
+                        const int scaledTileWidth = nextScreenX - currentScreenX;
+                        const int scaledTileHeight = nextScreenY - currentScreenY;
+
+                        if (type == 0) continue; //air
+                        if (scaledTileWidth <= 0 || scaledTileHeight <= 0) continue;
+
+                        switch (type)
+                        {
+                            case 1: textureId = "grass"; break;
+                            case 2: textureId = "dirt"; break;
+                            case 3: textureId = "stone"; break;
+                            case 4: textureId = "wood_log"; break;
+                            case 5: textureId = "torch"; break;
+                            case 6: textureId = "wood_plank"; break;
+                            case 7: textureId = "wood_plank_bg"; break;
+                            case 8: textureId = "stone_bg"; break;
+                            default: textureId = "missing_texture"; break;
+                        }
+
+                        if (layer == TileLayer::BACKGROUND)
+                        {
+                            SDL_SetTextureAlphaMod(texManager.getTexture(textureId), 150);
+                            texManager.draw(renderer, textureId, currentScreenX, currentScreenY, scaledTileWidth, scaledTileHeight);
+                            SDL_SetTextureAlphaMod(texManager.getTexture(textureId), 255);
+                        }
+                        else
+                            texManager.draw(renderer, textureId, currentScreenX, currentScreenY, scaledTileWidth, scaledTileHeight);
+                    }
                 }
+            }
+        }
+
+        if (layer == TileLayer::BACKGROUND)
+        {
+            //render all players
+            const int originalScaledTilePxSize = static_cast<int>(std::round(World::TILE_PX_SIZE * zoom));
+
+            for (auto& [id, p] : players)
+            {
+                const float playerWorldX = p.x * World::TILE_PX_SIZE; //unscaled float for X/Y (tile coordinate * tile size)
+                const float playerWorldY = p.y * World::TILE_PX_SIZE;
+                const int playerScreenX = static_cast<int>(std::floor(playerWorldX * zoom + cameraX));
+                const int playerScreenY = static_cast<int>(std::floor(playerWorldY * zoom + cameraY));
+
+                SDL_Rect rect
+                {
+                    playerScreenX,
+                    playerScreenY,
+                    originalScaledTilePxSize, //player width in scaled pixels (1 tile wide)
+                    originalScaledTilePxSize * 2 //player height in scaled pixels (2 tiles tall)
+                };
+
+                if (p.isLocal)
+                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); //draw local client as blue
+                else
+                    SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255); //everyone else draw yellow
+
+                SDL_RenderFillRect(renderer, &rect);
             }
         }
     }
 
-    const int originalScaledTilePxSize = static_cast<int>(std::round(World::TILE_PX_SIZE * zoom));
-
-    //render all players
-    for (auto& [id, p] : players)
-    {
-        const float playerWorldX = p.x * World::TILE_PX_SIZE; //unscaled float for X/Y (tile coordinate * tile size)
-        const float playerWorldY = p.y * World::TILE_PX_SIZE;
-        const int playerScreenX = static_cast<int>(std::floor(playerWorldX * zoom + cameraX));
-        const int playerScreenY = static_cast<int>(std::floor(playerWorldY * zoom + cameraY));
-
-        SDL_Rect rect
-        {
-            playerScreenX,
-            playerScreenY,
-            originalScaledTilePxSize,       //player width in scaled pixels (1 tile wide)
-            originalScaledTilePxSize * 2    //player height in scaled pixels (2 tiles tall)
-        };
-
-        if (p.isLocal)
-            SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);   //draw local client as blue
-        else
-            SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255); //everyone else draw yellow
-
-        SDL_RenderFillRect(renderer, &rect);
-    }
-
-    //render UI
     constexpr int margin = 10;
     SDL_Color textColor = { 255, 255, 255, 255 };
 
-    if (!isFreecamActive)
-    {
-        constexpr int iconSize = 32;
-        std::string blockName;
-
-        switch (currentHeldItem)
-        {
-        case 1: textureId = "grass"; blockName = "Grass"; break;
-        case 2: textureId = "dirt"; blockName = "Dirt"; break;
-        case 3: textureId = "stone"; blockName = "Stone"; break;
-        case 4: textureId = "wood_log"; blockName = "Wood Log"; break;
-        case 5: textureId = "torch"; blockName = "Torch"; break;
-        case 6: textureId = "wood_plank"; blockName = "Wood Plank"; break;
-        case 7: textureId = "wood_plank_bg"; blockName = "Wood Wall"; break;
-        case 8: textureId = "stone_bg"; blockName = "Stone Wall"; break;
-        default: textureId = "missing_texture"; blockName = "Invalid Texture!"; break;
-        }
-
-        if (currentHeldItem != 0)
-            texManager.draw(renderer, textureId, margin, margin, iconSize, iconSize);
-
-        std::string hotbarText = "Selected: " + blockName;
-        drawText(renderer, hotbarText, margin + iconSize + 5, margin + 8, textColor);
-    }
+    renderInventory(renderer, winW, winH);
 
     //zoom text set to 2 decimal places
     std::ostringstream zoomOss;

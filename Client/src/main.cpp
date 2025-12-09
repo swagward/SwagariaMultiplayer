@@ -33,15 +33,15 @@ int main(int argc, char* argv[])
 
     //load game textures
     TextureManager& texManager = TextureManager::getInstance();
-    texManager.loadTexture("grass", "assets/textures/grass.png", renderer);
-    texManager.loadTexture("dirt", "assets/textures/dirt.png", renderer);
-    texManager.loadTexture("missing_texture", "assets/textures/missing_texture.png", renderer);
-    texManager.loadTexture("stone", "assets/textures/stone.png", renderer);
-    texManager.loadTexture("torch", "assets/textures/torch.png", renderer);
-    texManager.loadTexture("wood_log", "assets/textures/wood_log.png", renderer);
-    texManager.loadTexture("wood_plank", "assets/textures/wood_plank.png", renderer);
-    texManager.loadTexture("wood_plank_bg", "assets/textures/wood_plank_bg.png", renderer);
-    texManager.loadTexture("stone_bg", "assets/textures/stone_bg.png", renderer);
+    texManager.loadTexture("grass", "assets/textures/tiles/grass.png", renderer);
+    texManager.loadTexture("dirt", "assets/textures/tiles/dirt.png", renderer);
+    texManager.loadTexture("missing_texture", "assets/textures/tiles/missing_texture.png", renderer);
+    texManager.loadTexture("stone", "assets/textures/tiles/stone.png", renderer);
+    texManager.loadTexture("torch", "assets/textures/tiles/torch.png", renderer);
+    texManager.loadTexture("wood_log", "assets/textures/tiles/wood_log.png", renderer);
+    texManager.loadTexture("wood_plank", "assets/textures/tiles/wood_plank.png", renderer);
+    texManager.loadTexture("wood_plank_bg", "assets/textures/tiles/wood_plank_bg.png", renderer);
+    texManager.loadTexture("stone_bg", "assets/textures/tiles/stone_bg.png", renderer);
 
     bool isRunning = true;
     SDL_Event event;

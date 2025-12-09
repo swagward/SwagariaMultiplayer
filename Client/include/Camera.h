@@ -11,14 +11,14 @@ public:
     void setScreenOffsetTarget(float targetScreenX, float targetScreenY);
     void handleZoom(int wheelDelta);
 
-    int getX() const { return static_cast<int>(x); }
-    int getY() const { return static_cast<int>(y); }
-    float getPreciseX() const { return x; }
-    float getPreciseY() const { return y; }
+    [[nodiscard]] int getX() const { return static_cast<int>(x); }
+    [[nodiscard]] int getY() const { return static_cast<int>(y); }
+    [[nodiscard]] float getPreciseX() const { return x; }
+    [[nodiscard]] float getPreciseY() const { return y; }
 
-    float getZoom() const { return zoom; }
-    float getTargetX() const { return targetX; }
-    float getTargetY() const { return targetY; }
+    [[nodiscard]] float getZoom() const { return zoom; }
+    [[nodiscard]] float getTargetX() const { return targetX; }
+    [[nodiscard]] float getTargetY() const { return targetY; }
 
 private:
     float x = 0.0f;

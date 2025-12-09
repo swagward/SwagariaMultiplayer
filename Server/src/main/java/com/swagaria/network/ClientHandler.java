@@ -1,7 +1,8 @@
 package com.swagaria.network;
 
 import com.swagaria.data.TerrainConfig;
-import com.swagaria.data.TileDefinition; // Use the new TileDefinition for IDs
+import com.swagaria.data.TileDefinition;
+import com.swagaria.data.TileLayer;
 import com.swagaria.game.Player;
 import com.swagaria.game.Chunk;
 
@@ -96,7 +97,7 @@ public class ClientHandler implements Runnable
         if (line == null || line.isEmpty())
             return;
 
-        String[] parts = line.split(",", 4);
+        String[] parts = line.split(",", 5);
         if (parts.length == 0)
             return;
 
@@ -112,18 +113,24 @@ public class ClientHandler implements Runnable
 
     private void handleSetTile(String[] parts)
     {
-        if (parts.length < 4) return;
+        if (parts.length < 5) return;
 
         try
         {
             int worldX = Integer.parseInt(parts[1].trim());
             int clientBottomUpY = Integer.parseInt(parts[2].trim());
-            int tileTypeId = Integer.parseInt(parts[3].trim()); // The tile to be set
+            int tileTypeId = Integer.parseInt(parts[3].trim());
+            int layerIndex = Integer.parseInt(parts[4].trim());
+
+            if (layerIndex < 0 || layerIndex >= TileLayer.NUM_LAYERS)
+            {
+                System.err.println("[Server] Invalid layer index: " + layerIndex + " from player #" + clientId);
+                return;
+            }
 
             Player p = server.getPlayer(clientId);
             if (p == null) return;
 
-            //tile edit is within reach (unchanged logic)
             float playerX = p.getX() + (Player.WIDTH / 2f);
             float playerY = p.getY() + (Player.HEIGHT / 2f);
 
@@ -140,107 +147,104 @@ public class ClientHandler implements Runnable
             if (distanceSq > Player.MAX_REACH_DISTANCE_SQ)
                 return;
 
-            int currentTileId = server.getWorld().getTileAt(worldX, serverTopDownY).getDefinition().typeID;
+            int currentTileId = server.getWorld().getTileAt(worldX, serverTopDownY, layerIndex).getTypeId();
 
-
-            // Placing a block (setting a non-Air tile)
+            //placing a tile
             if (tileTypeId != TileDefinition.ID_AIR)
             {
-                // Rule: No Overwriting - If any tile exists (solid or background), cannot be overwritten
+                //stop tiles from overwriting existing tiles (in the same layer)
                 if (currentTileId != TileDefinition.ID_AIR)
                     return;
 
-                // AABB intersection test to see if player tries placing inside themselves (UNCHANGED)
-                boolean overlaps = p.getX() < worldX + 1 &&
-                        p.getX() + Player.WIDTH > worldX &&
-                        p.getY() < serverTopDownY + 1 &&
-                        p.getY() + Player.HEIGHT > serverTopDownY;
+                //stop placing inside player (only applies to foreground)
+                if (layerIndex == TileLayer.FOREGROUND)
+                {
+                    boolean overlaps = p.getX() < worldX + 1 &&
+                            p.getX() + Player.WIDTH > worldX &&
+                            p.getY() < serverTopDownY + 1 &&
+                            p.getY() + Player.HEIGHT > serverTopDownY;
 
-                if (overlaps)
-                    return;
+                    if (overlaps)
+                        return;
+                }
 
-                // Enforce specific placement rules (adjacency, torches on ground, etc.)
-                if (!isPlacementValid(worldX, serverTopDownY, tileTypeId))
-                    return;
-
+                //check placement validation (only applies to foreground for now, like torches)
+                if (layerIndex == TileLayer.FOREGROUND)
+                {
+                    if (!isPlacementValid(worldX, serverTopDownY, tileTypeId))
+                        return;
+                }
 
                 //TODO: check if player has this item in inventory
             }
-            // Breaking a block (setting an Air tile)
+
+            //breaking (placing air)
             else if (tileTypeId == TileDefinition.ID_AIR)
             {
-                // Skip if the block is already air
+                // skip if already air (placing air on air)
                 if (currentTileId == TileDefinition.ID_AIR)
                     return;
 
-                // TODO: For now, we instantly break. In the next step, we'll introduce damage accumulation here.
-                // TODO: check if block is unbreakable (i.e: bedrock - we would check if it lacks a DurabilityComponent)
-                // TODO: check if player has the correct tool
+                //TODO: add damage accumulation / check tool
             }
 
-            // Perform the action
-            boolean success = server.getWorld().setTileAt(worldX, serverTopDownY, tileTypeId);
+            //try placing, if true then all good
+            boolean success = server.getWorld().setTileAt(worldX, serverTopDownY, layerIndex, tileTypeId);
 
             if (success)
             {
-                // Send the update using the new type ID
-                String updateMsg = "UPDATE_TILE," + worldX + "," + serverTopDownY + "," + tileTypeId;
+                String updateMsg = "UPDATE_TILE," + worldX + "," + serverTopDownY + "," + tileTypeId + "," + layerIndex;
                 server.broadcast(updateMsg);
             }
 
         }
         catch (NumberFormatException e)
         {
-            System.err.println("[Server] Bad SET_TILE from player #" + clientId);
+            System.err.println("[Server] Bad SET_TILE from player #" + clientId + ": " + e.getMessage());
         }
     }
 
-    /**
-     * Checks the specific placement rules for a new tile at the given coordinates.
-     * @param x The world X coordinate (tile).
-     * @param y The world Y coordinate (server top-down).
-     * @param tileToPlaceId The ID of the tile being placed.
-     * @return true if placement is allowed, false otherwise.
-     */
     private boolean isPlacementValid(int x, int y, int tileToPlaceId)
     {
-        // Torches are typically Tile ID 5 in your C++ client setup
+        //torch rule
         final int ID_TORCH = 5;
-
-        // Rule: Torches can only be placed if there is a block directly BELOW them.
         if (tileToPlaceId == ID_TORCH)
         {
-            // Check the block immediately below (Y + 1 in the top-down coordinate system)
-            int blockBelowId = server.getWorld().getTileAt(x, y + 1).getDefinition().typeID;
+            //can place if a foreground block is below it
+            int blockBelowId = server.getWorld().getTileAt(x, y + 1, TileLayer.FOREGROUND).getDefinition().typeID;
+            if (blockBelowId != TileDefinition.ID_AIR)
+                return true;
 
-            // Torch must be placed on a non-air block
-            return blockBelowId != TileDefinition.ID_AIR;
+            //can place if theres a background block behind it
+            int backgroundWallId = server.getWorld().getTileAt(x, y, TileLayer.BACKGROUND).getDefinition().typeID;
+            if (backgroundWallId != TileDefinition.ID_AIR)
+                return true;
+
+            return false;
         }
 
-
-        // Rule: All other blocks must have a non-air block adjacent (L, R, U, D).
-        // Neighbor coordinates (using server top-down Y):
+        //placing next to other tiles
         int[][] neighbors = {
-                {x - 1, y}, // Left
-                {x + 1, y}, // Right
-                {x, y - 1}, // Up (lower Y value)
-                {x, y + 1}  // Down (higher Y value)
+                {x - 1, y}, //left
+                {x + 1, y}, //right
+                {x, y - 1}, //up
+                {x, y + 1} //down
         };
 
         for (int[] pos : neighbors)
         {
-            int neighborX = pos[0];
-            int neighborY = pos[1];
+            //check if foreground is next to x/y
+            int fgNeighborId = server.getWorld().getTileAt(pos[0], pos[1], TileLayer.FOREGROUND).getDefinition().typeID;
+            if (fgNeighborId != TileDefinition.ID_AIR)
+                return true;
 
-            // Get the ID of the neighbor tile
-            int neighborId = server.getWorld().getTileAt(neighborX, neighborY).getDefinition().typeID;
-
-            // If ANY neighbor is non-air, placement is valid
-            if (neighborId != TileDefinition.ID_AIR)
+            //check if background block is behind x/y
+            int bgNeighborId = server.getWorld().getTileAt(pos[0], pos[1], TileLayer.BACKGROUND).getDefinition().typeID;
+            if (bgNeighborId != TileDefinition.ID_AIR)
                 return true;
         }
 
-        // If no adjacent non-air block was found
+        //if all nearby tiles are air
         return false;
     }
 
