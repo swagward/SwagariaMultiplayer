@@ -1,6 +1,6 @@
 package com.swagaria.data.components;
 
-import com.swagaria.data.TileComponent;
+import com.swagaria.data.terrain.TileComponent;
 
 public class DurabilityComponent implements TileComponent
 {

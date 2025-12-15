@@ -1,4 +1,4 @@
-package com.swagaria.data;
+package com.swagaria.data.terrain;
 
 import com.swagaria.util.OpenSimplexNoise;
 

@@ -1,10 +1,15 @@
 package com.swagaria.network;
 
-import com.swagaria.data.TerrainConfig;
-import com.swagaria.data.TileDefinition;
-import com.swagaria.data.TileLayer;
+import com.swagaria.data.ItemRegistry;
+import com.swagaria.data.inventory.ItemSlot;
+import com.swagaria.data.items.Item;
+import com.swagaria.data.items.TileItem;
+import com.swagaria.data.terrain.TerrainConfig;
+import com.swagaria.data.terrain.TileDefinition;
+import com.swagaria.data.terrain.TileLayer;
 import com.swagaria.game.Player;
 import com.swagaria.game.Chunk;
+import com.swagaria.game.World;
 
 import java.io.*;
 import java.net.Socket;
@@ -38,6 +43,9 @@ public class ClientHandler implements Runnable
             out.println("ASSIGN_ID," + clientId);
             out.flush();
 
+            out.println(ItemRegistry.getDefinitionSync());
+            out.flush();
+
             //tell others about new client join
             for (Player p : server.getAllPlayers())
             {
@@ -52,6 +60,9 @@ public class ClientHandler implements Runnable
             Player me = server.getPlayer(clientId);
             if (me != null)
             {
+                out.println(me.getInventory().serialize());
+                out.flush();
+
                 out.println("SPAWN," + clientId + "," + me.getX() + "," + me.getY());
                 out.flush();
             }
@@ -97,6 +108,7 @@ public class ClientHandler implements Runnable
         if (line == null || line.isEmpty())
             return;
 
+        //USE_ITEM,<slotIndex>,<posX>,<posY>
         String[] parts = line.split(",", 5);
         if (parts.length == 0)
             return;
@@ -106,145 +118,83 @@ public class ClientHandler implements Runnable
         switch (cmd)
         {
             case "INPUT" -> handleInput(parts);
-            case "SET_TILE" -> handleSetTile(parts);
+            case "USE_ITEM" -> handleUseItem(parts);
             default -> System.out.println("[Server] Unknown command: " + line);
         }
     }
 
-    private void handleSetTile(String[] parts)
+    private void handleUseItem(String[] parts)
     {
-        if (parts.length < 5) return;
+        if (parts.length < 4) return;
 
         try
         {
-            int worldX = Integer.parseInt(parts[1].trim());
-            int clientBottomUpY = Integer.parseInt(parts[2].trim());
-            int tileTypeId = Integer.parseInt(parts[3].trim());
-            int layerIndex = Integer.parseInt(parts[4].trim());
-
-            if (layerIndex < 0 || layerIndex >= TileLayer.NUM_LAYERS)
-            {
-                System.err.println("[Server] Invalid layer index: " + layerIndex + " from player #" + clientId);
-                return;
-            }
+            int slotIndex = Integer.parseInt(parts[1].trim());
+            int worldX = Integer.parseInt(parts[2].trim());
+            int worldY = Integer.parseInt(parts[3].trim());
 
             Player p = server.getPlayer(clientId);
             if (p == null) return;
 
-            float playerX = p.getX() + (Player.WIDTH / 2f);
-            float playerY = p.getY() + (Player.HEIGHT / 2f);
-
-            int worldHeightInTiles = TerrainConfig.WORLD_HEIGHT;
-            int serverTopDownY = worldHeightInTiles - 1 - clientBottomUpY;
-
-            float tileX = worldX + 0.5f;
-            float tileY = serverTopDownY + 0.5f;
-
-            float dx = playerX - tileX;
-            float dy = playerY - tileY;
-            float distanceSq = (dx * dx) + (dy * dy);
-
-            if (distanceSq > Player.MAX_REACH_DISTANCE_SQ)
+            ItemSlot slot = p.getInventory().getSlot(slotIndex);
+            Item item = slot.getItem();
+            if (item == null || slot.getQuantity() <= 0) //empty slot
                 return;
 
-            int currentTileId = server.getWorld().getTileAt(worldX, serverTopDownY, layerIndex).getTypeId();
+            int worldHeight = TerrainConfig.WORLD_HEIGHT;
+            int worldHeightFlipped = worldHeight - 1 - worldY;
+            if (p.getServer().getWorld().calculateDistanceSq(p.getX(), p.getY(), worldX,worldHeightFlipped) > Player.MAX_REACH_DISTANCE_SQ)
+                return; //reach check
 
-            //placing a tile
-            if (tileTypeId != TileDefinition.ID_AIR)
+            boolean worldModified = item.use(p, worldX, worldHeightFlipped, slotIndex);
+            if(worldModified)
             {
-                //stop tiles from overwriting existing tiles (in the same layer)
-                if (currentTileId != TileDefinition.ID_AIR)
-                    return;
-
-                //stop placing inside player (only applies to foreground)
-                if (layerIndex == TileLayer.FOREGROUND)
+                if(item instanceof TileItem tileItem)
                 {
-                    boolean overlaps = p.getX() < worldX + 1 &&
-                            p.getX() + Player.WIDTH > worldX &&
-                            p.getY() < serverTopDownY + 1 &&
-                            p.getY() + Player.HEIGHT > serverTopDownY;
-
-                    if (overlaps)
-                        return;
+                    TileDefinition def = TileDefinition.getDefinition(tileItem.getTileTypeID());
+                    String updateMsg = "UPDATE_TILE," + worldX + "," + worldHeightFlipped + "," + tileItem.getTileTypeID() + "," + def.layerToPlace;
+                    server.broadcast(updateMsg);
                 }
-
-                //check placement validation (only applies to foreground for now, like torches)
-                if (layerIndex == TileLayer.FOREGROUND)
-                {
-                    if (!isPlacementValid(worldX, serverTopDownY, tileTypeId))
-                        return;
-                }
-
-                //TODO: check if player has this item in inventory
             }
-
-            //breaking (placing air)
-            else if (tileTypeId == TileDefinition.ID_AIR)
-            {
-                // skip if already air (placing air on air)
-                if (currentTileId == TileDefinition.ID_AIR)
-                    return;
-
-                //TODO: add damage accumulation / check tool
-            }
-
-            //try placing, if true then all good
-            boolean success = server.getWorld().setTileAt(worldX, serverTopDownY, layerIndex, tileTypeId);
-
-            if (success)
-            {
-                String updateMsg = "UPDATE_TILE," + worldX + "," + serverTopDownY + "," + tileTypeId + "," + layerIndex;
-                server.broadcast(updateMsg);
-            }
-
         }
         catch (NumberFormatException e)
         {
-            System.err.println("[Server] Bad SET_TILE from player #" + clientId + ": " + e.getMessage());
+            System.err.println("[Server] Bad USE_ITEM command from player #" + clientId + ": " + e.getMessage());
         }
     }
 
-    private boolean isPlacementValid(int x, int y, int tileToPlaceId)
+    public boolean isPlacementValid(int x, int y, int tileToPlaceId)
     {
-        //torch rule
-        final int ID_TORCH = 5;
-        if (tileToPlaceId == ID_TORCH)
-        {
-            //can place if a foreground block is below it
-            int blockBelowId = server.getWorld().getTileAt(x, y + 1, TileLayer.FOREGROUND).getDefinition().typeID;
-            if (blockBelowId != TileDefinition.ID_AIR)
-                return true;
+        World world = server.getWorld();
 
-            //can place if theres a background block behind it
-            int backgroundWallId = server.getWorld().getTileAt(x, y, TileLayer.BACKGROUND).getDefinition().typeID;
-            if (backgroundWallId != TileDefinition.ID_AIR)
-                return true;
+        //torch rule
+        if (tileToPlaceId == TileDefinition.ID_TORCH)
+        {
+            //fuck my chud life
+            //check if foreground block is below
+            int blockBelow = world.getTileAt(x, y + 1, TileLayer.FOREGROUND).getTypeId();
+            if (blockBelow != TileDefinition.ID_AIR) return true;
+
+            //check if background block is behind
+            int wallBehind = world.getTileAt(x, y, TileLayer.BACKGROUND).getTypeId();
+            if (wallBehind != TileDefinition.ID_AIR) return true;
 
             return false;
         }
 
-        //placing next to other tiles
-        int[][] neighbors = {
-                {x - 1, y}, //left
-                {x + 1, y}, //right
-                {x, y - 1}, //up
-                {x, y + 1} //down
+        int[][] neighbours = {
+                {x - 1, y}, {x + 1, y}, {x, y - 1}, {x, y + 1}
         };
 
-        for (int[] pos : neighbors)
+        for (int[] pos : neighbours)
         {
-            //check if foreground is next to x/y
-            int fgNeighborId = server.getWorld().getTileAt(pos[0], pos[1], TileLayer.FOREGROUND).getDefinition().typeID;
-            if (fgNeighborId != TileDefinition.ID_AIR)
-                return true;
+            int fgNeighbourID = world.getTileAt(pos[0], pos[1], TileLayer.FOREGROUND).getTypeId();
+            int bgNeighbourID = world.getTileAt(pos[0], pos[1], TileLayer.BACKGROUND).getTypeId();
 
-            //check if background block is behind x/y
-            int bgNeighborId = server.getWorld().getTileAt(pos[0], pos[1], TileLayer.BACKGROUND).getDefinition().typeID;
-            if (bgNeighborId != TileDefinition.ID_AIR)
+            if(fgNeighbourID != TileDefinition.ID_AIR || bgNeighbourID != TileDefinition.ID_AIR)
                 return true;
         }
 
-        //if all nearby tiles are air
         return false;
     }
 

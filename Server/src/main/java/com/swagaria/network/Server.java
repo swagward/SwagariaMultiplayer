@@ -44,7 +44,7 @@ public class Server
                 int[] spawnTile = world.findSpawnTile();
                 float spawnX = spawnTile[0];  //horizontal center
                 float spawnY = spawnTile[1];  //just above surface
-                Player p = new Player(id, spawnX, spawnY);
+                Player p = new Player(id, spawnX, spawnY, this);
                 players.put(id, p);
 
                 ClientHandler h = new ClientHandler(sock, id, this);
@@ -59,6 +59,14 @@ public class Server
     public World getWorld() { return world; }
     public Collection<Player> getAllPlayers() { return players.values(); }
     public Player getPlayer(int id) { return players.get(id); }
+    public ClientHandler getClientHandler(int id) {
+        for (ClientHandler h : handlers) {
+            if (h.getClientId() == id) {
+                return h;
+            }
+        }
+        return null;
+    }
 
     public void broadcast(String msg)
     {

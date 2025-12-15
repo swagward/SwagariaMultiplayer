@@ -40,7 +40,6 @@ private:
 
     int localPlayerId = -1;
     std::unordered_map<int, Player> players;
-
     Inventory inventory;
     bool isInventoryOpen = false;
 

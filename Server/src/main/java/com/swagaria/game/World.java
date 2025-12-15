@@ -1,9 +1,9 @@
 package com.swagaria.game;
 
-import com.swagaria.data.TerrainConfig;
-import com.swagaria.data.Tile;
-import com.swagaria.data.TileDefinition;
-import com.swagaria.data.TileLayer;
+import com.swagaria.data.terrain.TerrainConfig;
+import com.swagaria.data.terrain.Tile;
+import com.swagaria.data.terrain.TileDefinition;
+import com.swagaria.data.terrain.TileLayer;
 import com.swagaria.data.components.CollisionComponent;
 
 import java.util.ArrayList;
@@ -124,5 +124,16 @@ public class World
     {
         double noise = TerrainConfig.NOISE.eval(worldX * TerrainConfig.NOISE_FREQ, 0);
         return (int)(TerrainConfig.BASE_HEIGHT + noise * TerrainConfig.NOISE_AMP);
+    }
+
+    public float calculateDistanceSq(float playerX, float playerY, int tileX, int tileY)
+    {
+        float tileCenterX = tileX + 0.5f;
+        float tileCenterY = tileY + 0.5f;
+
+        float dx = playerX - tileCenterX;
+        float dy = playerY - tileCenterY;
+
+        return (dx * dx) + (dy * dy);
     }
 }

@@ -1,16 +1,19 @@
 package com.swagaria.game;
 
+import com.swagaria.data.inventory.Inventory;
+import com.swagaria.network.Server;
+
 public class Player
 {
     private final int id;
-    private float x;
-    private float y;
-    private float lastX;
-    private float lastY;
-    private float vx = 0f;
-    private float vy = 0f;
+    private float x, y;
+    private final Server server;
+    private final Inventory inventory;
+    private float lastX, lastY;
+    private float vx = 0f, vy = 0f;
     private boolean up = false, left = false, right = false;
 
+    //movement
     private static final float MOVE_SPEED = 6.0f;      //tiles/sec
     private static final float JUMP_SPEED = 12.0f;     //tiles/sec
     private static final float GRAVITY = 40.0f;        //tiles/sec^2 (down)
@@ -22,14 +25,17 @@ public class Player
     public static final float HEIGHT = 2.0f;
 
     //player reach (for tile modification)
-    public static final float MAX_REACH_DISTANCE = 8000.0f;
+    public static final float MAX_REACH_DISTANCE = 10.0f;
     public static final float MAX_REACH_DISTANCE_SQ = MAX_REACH_DISTANCE * MAX_REACH_DISTANCE;
 
-    public Player(int id, float spawnX, float spawnY)
+    public Player(int id, float spawnX, float spawnY, Server server)
     {
         this.id = id;
         this.x = spawnX;
         this.y = spawnY;
+        this.server = server;
+        this.inventory = new Inventory(this);
+
         this.lastX = spawnX;
         this.lastY = spawnY;
     }
@@ -37,6 +43,8 @@ public class Player
     public int getId() { return id; }
     public float getX() { return x; }
     public float getY() { return y; }
+    public Server getServer() { return server; }
+    public Inventory getInventory() { return inventory; }
     public void setPosition(float nx, float ny) { this.x = nx; this.y = ny; }
     public void setVelocity(float nvx, float nvy) { this.vx = nvx; this.vy = nvy; }
     public float getVx() { return vx; }
@@ -63,6 +71,14 @@ public class Player
             case "RIGHT_DOWN" -> right = pressed;
             case "RIGHT_UP" -> right = false;
         }
+    }
+
+    public boolean overlapsTile(int tileX, int tileY)
+    {
+        return x < tileX + 1 &&
+                x + WIDTH > tileX &&
+                y < tileY + 1 &&
+                y + HEIGHT > tileY;
     }
 
     public boolean hasMoved()

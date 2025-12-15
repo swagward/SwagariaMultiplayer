@@ -3,12 +3,12 @@
 #include "ItemSlot.h"
 #include <vector>
 
-constexpr int HOTBAR_SIZE = 10;
-constexpr int INVENTORY_ROWS = 4;
-constexpr int INVENTORY_COLS = 10;
-constexpr int INVENTORY_SIZE = INVENTORY_COLS * INVENTORY_ROWS;
 constexpr int SLOT_SIZE = 64;
-constexpr int SPACING = 8; //spacing between slots
+constexpr int SPACING = 8;
+constexpr int HOTBAR_SIZE = 10; //0-9
+constexpr int INVENTORY_ROWS = 3;
+constexpr int INVENTORY_COLUMNS = 10;
+constexpr int INVENTORY_SIZE = HOTBAR_SIZE + (INVENTORY_ROWS * INVENTORY_COLUMNS);
 
 class Inventory
 {

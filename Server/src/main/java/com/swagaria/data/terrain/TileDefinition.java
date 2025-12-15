@@ -1,4 +1,4 @@
-package com.swagaria.data;
+package com.swagaria.data.terrain;
 
 import com.swagaria.data.components.*;
 import java.util.HashMap;
@@ -44,6 +44,11 @@ public class TileDefinition
 
     public boolean hasComponent(Class<? extends TileComponent> componentType) {
         return components.containsKey(componentType);
+    }
+
+    public boolean hasCollision() {
+        CollisionComponent collision = getComponent(CollisionComponent.class);
+        return collision != null && collision.blocksMovement;
     }
 
     private static final Map<Integer, TileDefinition> TILE_REGISTRY = new HashMap<>();

@@ -1,7 +1,7 @@
 #include "../include/Game.h"
 #include "../include/Network.h"
 #include "../include/TextureManager.h"
-#include "../include/TileDefinition.h"
+#include "../include/ItemRegistry.h"
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -79,6 +79,46 @@ void Game::handleOneNetworkMessage(const std::string& msg)
         const float y = std::stof(parts[3]);
         players[id] = { id, x, y, id == localPlayerId, "Player" + std::to_string(id) };
         std::cout << "[SERVER] Spawned player " << id << " at " << x << "," << y << std::endl;
+    }
+    else if (cmd == "ITEM_DEF_SYNC")
+    {
+        ItemRegistry::getInstance().clear();
+
+        //format:
+        //ITEM_DEF_SYNC,ID|Name|MaxStackSize|Type|Prop,ID|Name|...
+
+        if (parts.size() < 2) return;
+        std::istringstream defsSs(parts[1]);
+        std::string defString;
+
+        while (std::getline(defsSs, defString, '|'))
+        {
+            std::istringstream itemSs(defString);
+            std::string itemPart;
+            std::vector<std::string> itemProps;
+
+            //re-parse message using ":" to identify properties
+            while (std::getline(itemSs, itemPart, ':'))
+                itemProps.push_back(itemPart);
+
+            if (itemProps.size() < 5) continue; //ID:Name:MaxStackSize:Type:TileTypeID
+
+            ItemDefinition itemDef;
+            itemDef.id = std::stoi(itemProps[0]);
+            itemDef.name = itemProps[1];
+            itemDef.maxStack = std::stoi(itemProps[2]);
+            itemDef.isTile = (itemProps[3] == "T");
+            itemDef.tileTypeID = std::stoi(itemProps[4]);
+
+            //generate textureID from name
+            std::string name = itemDef.name;
+            std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+            std::replace(name.begin(), name.end(), ' ', '_');
+            itemDef.textureID = name;
+
+            ItemRegistry::getInstance().addDefinition(itemDef);
+            std::cout << "[SERVER] Loaded Item: " << itemDef.name << " (ID: " << itemDef.id << " texID: " << itemDef.textureID << ")" << std::endl;
+        }
     }
     else if (cmd == "PLAYER_MOVE")
     {
@@ -164,10 +204,11 @@ void Game::handleOneNetworkMessage(const std::string& msg)
     }
     else if (cmd == "UPDATE_SLOT")
     {
-        if (parts.size() < 4) return;
-        const int slotIndex = std::stoi(parts[1]);
-        const int itemID = std::stoi(parts[2]);
-        const int quantity = std::stoi(parts[3]);
+        //format: INV_UPDATE,playerID,slotIndex,itemID,quantity
+        if (parts.size() < 5) return;
+        const int slotIndex = std::stoi(parts[2]);
+        const int itemID = std::stoi(parts[3]);
+        const int quantity = std::stoi(parts[4]);
 
         inventory.updateSlot(slotIndex, itemID, quantity);
     }
@@ -239,66 +280,28 @@ void Game::handleInput(const SDL_Event& e)
     //tile interaction (when freecam is disabled)
     else if (e.type == SDL_MOUSEBUTTONDOWN && !isFreecamActive)
     {
-        int tileToSend = -1;
-        int layerToSend = -1;
-        const int currentHeldItem = inventory.getCurrentHeldItem();
+        const int slotIndex = inventory.selectedHotbarIndex;
 
-        //helper to get the layer based on tile ID
-        auto determineLayer = [&](const int itemID) -> int
-        {
-            if (itemID == TileDefinition::ID_WOOD_PLANK_BG || itemID == TileDefinition::ID_STONE_BG)
-                return TileLayer::BACKGROUND;
-            return TileLayer::FOREGROUND;
-        };
-
-        if (e.button.button == SDL_BUTTON_LEFT) //break (place air)
-        {
-            std::cout << "[CLICK DEBUG] Type: LEFT CLICK (BREAK)" << std::endl;
-            //prefer to break foreground
-            tileToSend = TileDefinition::ID_AIR;
-            layerToSend = TileLayer::FOREGROUND;
-        }
-        else if (e.button.button == SDL_BUTTON_RIGHT) //place tile
-        {
-            std::cout << "[CLICK DEBUG] Type: RIGHT CLICK (PLACE)" << std::endl;
-            if (currentHeldItem != TileDefinition::ID_AIR)
-            {
-                tileToSend = currentHeldItem;
-                layerToSend = determineLayer(currentHeldItem);
-
-            }
-        }
-        if (tileToSend == -1)
-        {
-            std::cout << "[CLIENT DEBUG] tileToSend is -1. Message not queued." << std::endl;
-            return;
-        }
-
+        //get target coords
         const float zoom = camera.getZoom();
-        //get mouse position in world space
-        const float mouseWorldOffsetScaledX = static_cast<float>(e.button.x) - camera.getPreciseX();
-        const float mouseWorldOffsetScaledY = static_cast<float>(e.button.y) - camera.getPreciseY();
-        const float mouseWorldX = mouseWorldOffsetScaledX / zoom;
-        const float mouseWorldY = mouseWorldOffsetScaledY / zoom;
+        const float mouseWorldOffsetX = static_cast<float>(e.button.x) - camera.getPreciseX();
+        const float mouseWorldOffsetY = static_cast<float>(e.button.y) - camera.getPreciseY();
+        const float mouseWorldX = mouseWorldOffsetX / zoom;
+        const float mouseWorldY = mouseWorldOffsetY / zoom;
 
-        //convert pixel coord to tile coord
+        //convert pixel to tile
         const int tileX = static_cast<int>(std::floor(mouseWorldX / World::TILE_PX_SIZE));
         const int tileY = static_cast<int>(std::floor(mouseWorldY / World::TILE_PX_SIZE));
 
         //conversion for sdl2 (top-down) & java/server Y origin (bottom-up)
         constexpr int worldHeightInTiles = World::WORLD_HEIGHT_IN_CHUNKS * Chunk::SIZE;
-        const int fixedTileY = worldHeightInTiles - 1 - tileY;
+        const int tileYFlipped = worldHeightInTiles - 1 - tileY;
 
         std::ostringstream oss;
-        oss << "SET_TILE," << tileX << "," << fixedTileY << "," << tileToSend << "," << layerToSend;
-
-        const std::string message = oss.str();
-        std::cout << "[CLIENT DEBUG] Queuing network message: " << message << std::endl;
-
-        if (network)
-            network->queueMessage(message);
+        oss << "USE_ITEM," << slotIndex << "," << tileX << "," << tileYFlipped;
+        std::cout << oss.str();
     }
-    //scrollwheel cycle for tiles/speed/zoom
+    //scroll wheel cycle for tiles/speed/zoom
     else if (e.type == SDL_MOUSEWHEEL)
     {
         if (SDL_GetModState() & KMOD_CTRL)

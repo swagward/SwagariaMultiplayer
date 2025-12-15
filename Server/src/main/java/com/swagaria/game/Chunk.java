@@ -1,9 +1,9 @@
 package com.swagaria.game;
 
-import com.swagaria.data.TerrainConfig;
-import com.swagaria.data.Tile;
-import com.swagaria.data.TileDefinition;
-import com.swagaria.data.TileLayer;
+import com.swagaria.data.terrain.TerrainConfig;
+import com.swagaria.data.terrain.Tile;
+import com.swagaria.data.terrain.TileDefinition;
+import com.swagaria.data.terrain.TileLayer;
 
 public class Chunk
 {
