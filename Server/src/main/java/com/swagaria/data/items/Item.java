@@ -23,5 +23,5 @@ public abstract class Item
     public String getName() { return name; }
     public int getMaxStackSize() { return maxStackSize; }
 
-    public abstract boolean use(com.swagaria.game.Player caller, int targetX, int targetY, int slotIndex);
+    public abstract boolean use(com.swagaria.game.Player caller, int posX, int posY, int slotIndex);
 }

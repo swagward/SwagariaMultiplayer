@@ -1,6 +1,8 @@
 package com.swagaria.data.terrain;
 
 import com.swagaria.data.components.*;
+import com.swagaria.data.items.ToolType;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,6 +22,7 @@ public class TileDefinition
     public static final int ID_WOOD_PLANK = 6;
     public static final int ID_WOOD_PLANK_BG = 7;
     public static final int ID_STONE_BG = 8;
+    public static final int ID_DIRT_BG = 9;
 
     public final int typeID;
     public final String name;
@@ -60,44 +63,57 @@ public class TileDefinition
 
         TILE_REGISTRY.put(ID_GRASS, new TileDefinition(ID_GRASS, "Grass Block", TileLayer.FOREGROUND,
                 new CollisionComponent(true),
-                new DurabilityComponent(5.0f, ID_GRASS)
+                new DurabilityComponent(1, ID_GRASS),
+                new RequiredToolComponent(ToolType.PICKAXE)
         ));
 
         TILE_REGISTRY.put(ID_DIRT, new TileDefinition(ID_DIRT, "Dirt Block", TileLayer.FOREGROUND,
                 new CollisionComponent(true),
-                new DurabilityComponent(4.0f, ID_DIRT)
+                new DurabilityComponent(2, ID_DIRT),
+                new RequiredToolComponent(ToolType.PICKAXE)
         ));
 
         TILE_REGISTRY.put(ID_STONE, new TileDefinition(ID_STONE, "Stone Block", TileLayer.FOREGROUND,
                 new CollisionComponent(true),
-                new DurabilityComponent(10.0f, ID_STONE)
+                new DurabilityComponent(4, ID_STONE),
+                new RequiredToolComponent(ToolType.PICKAXE)
         ));
 
-        //TODO: need to change to background but im lazy
-        TILE_REGISTRY.put(ID_WOOD_LOG, new TileDefinition(ID_WOOD_LOG, "Wood Log", TileLayer.BACKGROUND,
-                new CollisionComponent(true),
-                new DurabilityComponent(6.0f, ID_WOOD_LOG)
+        TILE_REGISTRY.put(ID_WOOD_LOG, new TileDefinition(ID_WOOD_LOG, "Wood Log", TileLayer.FOREGROUND,
+                new CollisionComponent(false),
+                new DurabilityComponent(2, ID_WOOD_LOG),
+                new RequiredToolComponent(ToolType.AXE)
         ));
 
         TILE_REGISTRY.put(ID_TORCH, new TileDefinition(ID_TORCH, "Torch", TileLayer.FOREGROUND,
                 new CollisionComponent(false),
-                new DurabilityComponent(1.0f, ID_TORCH),
-                new LightSourceComponent(15)
+                new DurabilityComponent(1, ID_TORCH),
+                new LightSourceComponent(15),
+                new RequiredToolComponent(ToolType.ANY)
         ));
 
         TILE_REGISTRY.put(ID_WOOD_PLANK, new TileDefinition(ID_WOOD_PLANK, "Wood Plank", TileLayer.FOREGROUND,
                 new CollisionComponent(true),
-                new DurabilityComponent(7.0f, ID_WOOD_PLANK)
+                new DurabilityComponent(3, ID_WOOD_PLANK),
+                new RequiredToolComponent(ToolType.PICKAXE)
         ));
 
         TILE_REGISTRY.put(ID_WOOD_PLANK_BG, new TileDefinition(ID_WOOD_PLANK_BG, "Wood Wall", TileLayer.BACKGROUND,
                 new CollisionComponent(false),
-                new DurabilityComponent(7.0f, ID_WOOD_PLANK_BG)
+                new DurabilityComponent(2, ID_WOOD_PLANK_BG),
+                new RequiredToolComponent(ToolType.HAMMER)
         ));
 
         TILE_REGISTRY.put(ID_STONE_BG, new TileDefinition(ID_STONE_BG, "Stone Wall", TileLayer.BACKGROUND,
                 new CollisionComponent(false),
-                new DurabilityComponent(8.0f, ID_STONE_BG)
+                new DurabilityComponent(3, ID_STONE_BG),
+                new RequiredToolComponent(ToolType.HAMMER)
+        ));
+
+        TILE_REGISTRY.put(ID_DIRT_BG, new TileDefinition(ID_DIRT_BG, "Dirt Wall", TileLayer.BACKGROUND,
+                new CollisionComponent(false),
+                new DurabilityComponent(1, ID_DIRT_BG),
+                new RequiredToolComponent(ToolType.HAMMER)
         ));
     }
 

@@ -41,6 +41,7 @@ public class TileItem extends Item
         if(!caller.getServer().getClientHandler(caller.getId()).isPlacementValid(posX, posY, tileTypeID))
             return false;
 
+        //add tile and remove from inventory
         world.setTileAt(posX, posY, layer, tileTypeID);
         caller.getInventory().decreaseQuantity(slotIndex, 1);
 

@@ -4,12 +4,12 @@ import com.swagaria.data.terrain.TileComponent;
 
 public class DurabilityComponent implements TileComponent
 {
-    public final float maxDurability; //how many hits to break block
+    public final int hitsRequired; //how many hits to break block (not used atm because im lazy)
     public final int itemDropID; //what is dropped on break
 
-    public DurabilityComponent(float _maxDurability, int _itemDropID)
+    public DurabilityComponent(int _hitsRequired, int _itemDropID)
     {
-        maxDurability = _maxDurability;
+        hitsRequired = _hitsRequired;
         itemDropID = _itemDropID;
     }
 }

@@ -42,6 +42,11 @@ int main(int argc, char* argv[])
     texManager.loadTexture("wood_plank", "assets/textures/tiles/wood_plank.png", renderer);
     texManager.loadTexture("wood_plank_bg", "assets/textures/tiles/wood_plank_bg.png", renderer);
     texManager.loadTexture("stone_bg", "assets/textures/tiles/stone_bg.png", renderer);
+    texManager.loadTexture("dirt_bg", "assets/textures/tiles/dirt_bg.png", renderer);
+    texManager.loadTexture("copper_pickaxe", "assets/textures/tools/copper_pickaxe.png", renderer);
+    texManager.loadTexture("copper_axe", "assets/textures/tools/copper_axe.png", renderer);
+    texManager.loadTexture("copper_hammer", "assets/textures/tools/copper_hammer.png", renderer);
+
 
     bool isRunning = true;
     SDL_Event event;

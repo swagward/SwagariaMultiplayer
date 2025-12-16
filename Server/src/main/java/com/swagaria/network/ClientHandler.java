@@ -4,6 +4,7 @@ import com.swagaria.data.ItemRegistry;
 import com.swagaria.data.inventory.ItemSlot;
 import com.swagaria.data.items.Item;
 import com.swagaria.data.items.TileItem;
+import com.swagaria.data.items.ToolItem;
 import com.swagaria.data.terrain.TerrainConfig;
 import com.swagaria.data.terrain.TileDefinition;
 import com.swagaria.data.terrain.TileLayer;
@@ -146,13 +147,21 @@ public class ClientHandler implements Runnable
             if (p.getServer().getWorld().calculateDistanceSq(p.getX(), p.getY(), worldX,worldHeightFlipped) > Player.MAX_REACH_DISTANCE_SQ)
                 return; //reach check
 
-            boolean worldModified = item.use(p, worldX, worldHeightFlipped, slotIndex);
+            boolean worldModified = false;
+            if(item != null)
+                worldModified = item.use(p, worldX, worldHeightFlipped, slotIndex);
+
             if(worldModified)
             {
                 if(item instanceof TileItem tileItem)
                 {
                     TileDefinition def = TileDefinition.getDefinition(tileItem.getTileTypeID());
                     String updateMsg = "UPDATE_TILE," + worldX + "," + worldHeightFlipped + "," + tileItem.getTileTypeID() + "," + def.layerToPlace;
+                    server.broadcast(updateMsg);
+                }
+                else if(item instanceof ToolItem toolItem)
+                {
+                    String updateMsg = "UPDATE_TILE," + worldX + "," + worldHeightFlipped + "," + TileDefinition.ID_AIR + "," + toolItem.layerToBreak;
                     server.broadcast(updateMsg);
                 }
             }

@@ -84,8 +84,10 @@ void Game::handleOneNetworkMessage(const std::string& msg)
     {
         ItemRegistry::getInstance().clear();
 
-        //format:
-        //ITEM_DEF_SYNC,ID|Name|MaxStackSize|Type|Prop,ID|Name|...
+        // format:
+        // ITEM_DEF_SYNC,ID:Name:MaxStackSize:Type:Prop1:Prop2|ID:Name:MaxStackSize:Type:Prop1:Prop2|...
+        // TILE: ID:Name:MaxStackSize:T:TileTypeID
+        // TOOL: ID:Name:MaxStackSize:R:ToolType:Damage
 
         if (parts.size() < 2) return;
         std::istringstream defsSs(parts[1]);
@@ -93,31 +95,60 @@ void Game::handleOneNetworkMessage(const std::string& msg)
 
         while (std::getline(defsSs, defString, '|'))
         {
+            if (defString.empty()) continue;
+
             std::istringstream itemSs(defString);
             std::string itemPart;
             std::vector<std::string> itemProps;
 
-            //re-parse message using ":" to identify properties
+            // re-parse message using ":" to identify properties
             while (std::getline(itemSs, itemPart, ':'))
                 itemProps.push_back(itemPart);
 
-            if (itemProps.size() < 5) continue; //ID:Name:MaxStackSize:Type:TileTypeID
+            // Need at least 4 parts: ID:Name:MaxStackSize:Type
+            if (itemProps.size() < 4) continue;
 
             ItemDefinition itemDef;
             itemDef.id = std::stoi(itemProps[0]);
             itemDef.name = itemProps[1];
             itemDef.maxStack = std::stoi(itemProps[2]);
-            itemDef.isTile = (itemProps[3] == "T");
-            itemDef.tileTypeID = std::stoi(itemProps[4]);
+            std::string typeCode = itemProps[3];
 
-            //generate textureID from name
+            std::string logMessage = "";
+
+            if (typeCode == "T")
+            {
+                if (itemProps.size() < 5) continue;
+                itemDef.isTile = true;
+                itemDef.tileTypeID = std::stoi(itemProps[4]);
+                logMessage = itemDef.name + " (ID: " + std::to_string(itemDef.id) + ", TileID: " + std::to_string(itemDef.tileTypeID) + ")";
+            }
+            else if (typeCode == "R")
+            {
+                if (itemProps.size() < 6) continue;
+                itemDef.isTile = false;
+                itemDef.tileTypeID = 0;
+
+                const std::string toolTypeName = itemProps[4];
+                const int damage = std::stoi(itemProps[5]);
+
+                logMessage = itemDef.name + " (ID: " + std::to_string(itemDef.id) + ", Type: " + toolTypeName + ", Damage: " + std::to_string(damage) + ")";
+            }
+            else
+            {
+                 itemDef.isTile = false;
+                 itemDef.tileTypeID = 0;
+                 logMessage = itemDef.name + " (ID: " + std::to_string(itemDef.id) + ", Generic)";
+            }
+
+            // generate textureID from name
             std::string name = itemDef.name;
             std::transform(name.begin(), name.end(), name.begin(), ::tolower);
             std::replace(name.begin(), name.end(), ' ', '_');
             itemDef.textureID = name;
 
             ItemRegistry::getInstance().addDefinition(itemDef);
-            std::cout << "[SERVER] Loaded Item: " << itemDef.name << " (ID: " << itemDef.id << " texID: " << itemDef.textureID << ")" << std::endl;
+            std::cout << "[SERVER] Loaded Item: " << logMessage << " texID: " << itemDef.textureID << std::endl;
         }
     }
     else if (cmd == "PLAYER_MOVE")
@@ -202,7 +233,7 @@ void Game::handleOneNetworkMessage(const std::string& msg)
         if (Chunk* chunk = world->getChunk(chunkX, fixedChunkY))
             chunk->setTile(tileX, tileY_BottomUp, layerIndex, newTileType);
     }
-    else if (cmd == "UPDATE_SLOT")
+    else if (cmd == "INV_UPDATE")
     {
         //format: INV_UPDATE,playerID,slotIndex,itemID,quantity
         if (parts.size() < 5) return;
@@ -211,7 +242,39 @@ void Game::handleOneNetworkMessage(const std::string& msg)
         const int quantity = std::stoi(parts[4]);
 
         inventory.updateSlot(slotIndex, itemID, quantity);
+        if (ItemRegistry::getInstance().getDefinition(itemID).id == 0 && itemID != 0) {
+            std::cerr << "[WARNING] Received INV_UPDATE for unknown item ID: " << itemID
+                      << " in slot " << slotIndex << ". Check if ITEM_DEF_SYNC ran first.\n";
+        }
     }
+    else if (cmd == "INV_SYNC")
+    {
+        constexpr int TOTAL_SLOTS = 40; //hardcoded because im lazy
+        for (int i = 0; i < TOTAL_SLOTS; i++)
+        {
+            const int partIndex = 2 + (i * 2);
+            if (partIndex + 1 < parts.size())
+            {
+                try
+                {
+                    const int itemID = std::stoi(parts[partIndex]);
+                    const int quantity = std::stoi(parts[partIndex + 1]);
+                    inventory.updateSlot(i, itemID, quantity);
+                }
+                catch (const std::exception& e)
+                {
+                    std::cerr << "[ERROR] Failed to parse INV_SYNC data for slot " << i << ": " << e.what() << std::endl;
+                    return; //if one slot is corrupted more might be so just stop
+                }
+            }
+            else //message is shorter than expected
+            {
+                std::cerr << "[ERROR] INV_SYNC message truncated, stopping load at slot: " << i << std::endl;
+                break;
+            }
+        }
+    }
+    else std::cerr << "[ERROR] Unknown command: " << cmd << std::endl;
 }
 
 void Game::handleInput(const SDL_Event& e)
@@ -299,7 +362,8 @@ void Game::handleInput(const SDL_Event& e)
 
         std::ostringstream oss;
         oss << "USE_ITEM," << slotIndex << "," << tileX << "," << tileYFlipped;
-        std::cout << oss.str();
+        if (network)
+            network->queueMessage(oss.str());
     }
     //scroll wheel cycle for tiles/speed/zoom
     else if (e.type == SDL_MOUSEWHEEL)
@@ -365,14 +429,16 @@ void Game::renderInventory(SDL_Renderer* renderer, const int winW, const int win
         //adding textures to filled slots
         if (!slot.isEmpty())
         {
-            texManager.draw(renderer, slot.getTextureID(), x, y, SLOT_SIZE, SLOT_SIZE);
+            constexpr int iconSize = static_cast<int>(SLOT_SIZE * 0.75f);
+            constexpr int iconOffset = (SLOT_SIZE - iconSize) / 2;
+            texManager.draw(renderer, slot.getTextureID(), x + iconOffset, y + iconOffset, iconSize, iconSize);
 
             std::string itemQuantity = std::to_string(slot.quantity);
             drawText(renderer, itemQuantity, x + SLOT_SIZE - static_cast<int>(itemQuantity.length()) * 10, y + SLOT_SIZE - 25, textColor);
         }
     }
 
-    if (!inventory.mouseHeldItem.isEmpty())
+    /*if (!inventory.mouseHeldItem.isEmpty())
     {
         //get mouse position and render block image to it
         int mouseX, mouseY;
@@ -383,7 +449,7 @@ void Game::renderInventory(SDL_Renderer* renderer, const int winW, const int win
 
         std::string heldItemQuantity = std::to_string(heldSlot.quantity);
         drawText(renderer, heldItemQuantity, mouseX - static_cast<int>(heldItemQuantity.length()) * 10, mouseY + SLOT_SIZE / 2 - 25, textColor);
-    }
+    }*/
 }
 
 
@@ -482,6 +548,7 @@ void Game::render(SDL_Renderer* renderer)
                             case 6: textureId = "wood_plank"; break;
                             case 7: textureId = "wood_plank_bg"; break;
                             case 8: textureId = "stone_bg"; break;
+                            case 9: textureId = "dirt_bg"; break;
                             default: textureId = "missing_texture"; break;
                         }
 

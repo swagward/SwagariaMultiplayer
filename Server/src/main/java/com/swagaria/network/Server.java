@@ -68,17 +68,26 @@ public class Server
         return null;
     }
 
+    //send message to all clients
     public void broadcast(String msg)
     {
         for (ClientHandler ch : handlers)
             ch.sendMessage(msg);
     }
 
+    //send message to all clients, excluding one
     public void broadcastExcept(String msg, int excludeId)
     {
         for (ClientHandler ch : handlers)
             if (ch.getClientId() != excludeId)
                 ch.sendMessage(msg);
+    }
+
+    //need method to send message to one client here
+    public void sendMessageTo(String msg, int targetId)
+    {
+        ClientHandler ch = getClientHandler(targetId);
+        ch.sendMessage(msg);
     }
 
     public void removeClient(int id, ClientHandler handler)
