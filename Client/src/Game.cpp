@@ -299,8 +299,47 @@ void Game::handleInput(const SDL_Event& e)
     //inventory interaction
     if (isInventoryOpen)
     {
-        //TODO: add click/drag logic later
-        //maybe make a server-side thing instead??
+        if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
+        {
+            int winW, winH;
+            if (SDL_Renderer* renderer = SDL_GetRenderer(SDL_GetWindowFromID(1)))
+                SDL_GetRendererOutputSize(renderer, &winW, &winH);
+            else return;
+
+            if (const int targetSlotIndex = getSlotIndexAt(e.button.x, e.button.y, winW, winH); targetSlotIndex != -1)
+            {
+                ItemSlot& targetSlot = inventory.slots[targetSlotIndex];
+                if (ItemSlot& heldItem = inventory.mouseHeldItem; !heldItem.isEmpty())
+                {
+                    //merge attempt
+                    if (!targetSlot.isEmpty() && heldItem.itemID == targetSlot.itemID)
+                    {
+                        const auto& def = ItemRegistry::getInstance().getDefinition(heldItem.itemID);
+                        const int maxStack = def.maxStack;
+
+                        int canAdd = maxStack - targetSlot.quantity;
+                        if (int transfer = std::min(heldItem.quantity, canAdd); transfer > 0)
+                        {
+                            targetSlot.quantity += transfer;
+                            heldItem.quantity -= transfer;
+
+                            if (heldItem.quantity <= 0)
+                                heldItem = { 0, 0 };
+                        }
+                    }
+                    else
+                    {
+                        //handles dropping into empty slot/swapping two different stacks
+                        std::swap(targetSlot, heldItem);
+                    }
+                }
+                else if (!targetSlot.isEmpty())
+                {
+                    std::swap(targetSlot, heldItem);
+                }
+            }
+        }
+        return;
     }
     //handle movement
     if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP)
@@ -395,7 +434,7 @@ void Game::handleInput(const SDL_Event& e)
     else if (e.type == SDL_KEYDOWN && e.key.keysym.sym >= SDLK_1 && e.key.keysym.sym <= SDLK_9 && !isInventoryOpen)
         inventory.selectedHotbarIndex = (e.key.keysym.sym - SDLK_1);
     else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_0 && !isInventoryOpen)
-        inventory.selectedHotbarIndex = 0;
+        inventory.selectedHotbarIndex = 9;
 }
 
 void Game::renderInventory(SDL_Renderer* renderer, const int winW, const int winH) const
@@ -438,21 +477,48 @@ void Game::renderInventory(SDL_Renderer* renderer, const int winW, const int win
         }
     }
 
-    /*if (!inventory.mouseHeldItem.isEmpty())
+    if (!inventory.mouseHeldItem.isEmpty())
     {
         //get mouse position and render block image to it
         int mouseX, mouseY;
         SDL_GetMouseState(&mouseX, &mouseY);
 
         const auto& heldSlot = inventory.mouseHeldItem;
-        texManager.draw(renderer, heldSlot.getTextureID(), mouseX - SLOT_SIZE / 2, mouseY - SLOT_SIZE / 2, SLOT_SIZE, SLOT_SIZE);
 
-        std::string heldItemQuantity = std::to_string(heldSlot.quantity);
-        drawText(renderer, heldItemQuantity, mouseX - static_cast<int>(heldItemQuantity.length()) * 10, mouseY + SLOT_SIZE / 2 - 25, textColor);
-    }*/
+        // Draw the item texture centered on the mouse cursor
+        constexpr int iconSize = static_cast<int>(SLOT_SIZE * 0.75f);
+        texManager.draw(renderer, heldSlot.getTextureID(),
+                        mouseX - iconSize / 2, mouseY - iconSize / 2,
+                        iconSize, iconSize);
+
+        // Draw quantity text next to the held item
+        const std::string heldItemQuantity = std::to_string(heldSlot.quantity);
+        drawText(renderer, heldItemQuantity,
+                 mouseX + iconSize / 2 + 5, mouseY - 15, // Offset slightly from the center/right of the icon
+                 textColor);
+    }
 }
 
+int Game::getSlotIndexAt(const int mouseX, const int mouseY, const int winW, const int winH) const
+{
+    int maxSlot = HOTBAR_SIZE;
+    if (isInventoryOpen)
+        maxSlot = INVENTORY_SIZE;
 
+    for (int i = 0; i < maxSlot; ++i)
+    {
+        int slotX, slotY;
+        Inventory::getSlotScreenPosition(i, slotX, slotY, winW, winH);
+
+        if (mouseX >= slotX && mouseX < slotX + SLOT_SIZE &&
+            mouseY >= slotY && mouseY < slotY + SLOT_SIZE)
+        {
+            return i;
+        }
+    }
+
+    return -1; // No slot found
+}
 
 void Game::render(SDL_Renderer* renderer)
 {

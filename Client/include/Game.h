@@ -25,6 +25,7 @@ public:
     void handleInput(const SDL_Event& e);            //called from main thread
     void render(SDL_Renderer* renderer);
     void renderInventory(SDL_Renderer* renderer, int winW, int winH) const;
+    int getSlotIndexAt(int mouseX, int mouseY, int winW, int winH) const;
     void update();
 
     int getLocalPlayerId() const { return localPlayerId; }
