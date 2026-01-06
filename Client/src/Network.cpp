@@ -27,12 +27,11 @@ bool Network::connectToServer(const std::string& host, const int port)
         return false;
     }
 
-    // This call is the one that "stalls" if the firewall drops the packet
     socket = SDLNet_TCP_Open(&ip);
-
     if (!socket)
     {
-        std::cerr << "[NETWORK] Connection failed. Potential causes: \n"
+        //debugs in case the player cant connect for whatever reason
+        std::cerr << "[NETWORK] Connection failed. Possible causes: \n"
                   << "1. Firewall blocking port " << port << " on Host\n"
                   << "2. Players are on different subnets\n"
                   << "3. Wrong IP address entered.\n"

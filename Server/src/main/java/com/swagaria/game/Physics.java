@@ -2,7 +2,7 @@ package com.swagaria.game;
 
 public class Physics
 {
-
+    //fuck my chungus life bro :sob:
     public static void stepPlayer(Player p, World world, float dt)
     {
         float x = p.getX();

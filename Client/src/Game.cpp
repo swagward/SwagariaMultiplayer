@@ -77,17 +77,17 @@ void Game::handleOneNetworkMessage(const std::string& msg)
         const int id = std::stoi(parts[1]);
         const float x = std::stof(parts[2]);
         const float y = std::stof(parts[3]);
-        players[id] = { id, x, y, id == localPlayerId, "Player" + std::to_string(id) };
+        players[id] = { id, x, y, x, y, id == localPlayerId, "Player" + std::to_string(id) };
         std::cout << "[SERVER] Spawned player " << id << " at " << x << "," << y << std::endl;
     }
     else if (cmd == "ITEM_DEF_SYNC")
     {
         ItemRegistry::getInstance().clear();
 
-        // format:
-        // ITEM_DEF_SYNC,ID:Name:MaxStackSize:Type:Prop1:Prop2|ID:Name:MaxStackSize:Type:Prop1:Prop2|...
-        // TILE: ID:Name:MaxStackSize:T:TileTypeID
-        // TOOL: ID:Name:MaxStackSize:R:ToolType:Damage
+        //format:
+        //ITEM_DEF_SYNC,ID:Name:MaxStackSize:Type:Prop1:Prop2|ID:Name:MaxStackSize:Type:Prop1:Prop2|...
+        //TILE: ID:Name:MaxStackSize:T:TileTypeID
+        //TOOL: ID:Name:MaxStackSize:R:ToolType:Damage
 
         if (parts.size() < 2) return;
         std::istringstream defsSs(parts[1]);
@@ -105,7 +105,7 @@ void Game::handleOneNetworkMessage(const std::string& msg)
             while (std::getline(itemSs, itemPart, ':'))
                 itemProps.push_back(itemPart);
 
-            // Need at least 4 parts: ID:Name:MaxStackSize:Type
+            //needs: ID:Name:MaxStackSize:Type
             if (itemProps.size() < 4) continue;
 
             ItemDefinition itemDef;
@@ -114,7 +114,7 @@ void Game::handleOneNetworkMessage(const std::string& msg)
             itemDef.maxStack = std::stoi(itemProps[2]);
             std::string typeCode = itemProps[3];
 
-            std::string logMessage = "";
+            std::string logMessage;
 
             if (typeCode == "T")
             {
@@ -129,7 +129,7 @@ void Game::handleOneNetworkMessage(const std::string& msg)
                 itemDef.isTile = false;
                 itemDef.tileTypeID = 0;
 
-                const std::string toolTypeName = itemProps[4];
+                const std::string& toolTypeName = itemProps[4];
                 const int damage = std::stoi(itemProps[5]);
 
                 logMessage = itemDef.name + " (ID: " + std::to_string(itemDef.id) + ", Type: " + toolTypeName + ", Damage: " + std::to_string(damage) + ")";
@@ -154,12 +154,22 @@ void Game::handleOneNetworkMessage(const std::string& msg)
     else if (cmd == "PLAYER_MOVE")
     {
         const int id = std::stoi(parts[1]);
-        const float x = std::stof(parts[2]);
-        const float y = std::stof(parts[3]);
+        const float targetX = std::stof(parts[2]);
+        const float targetY = std::stof(parts[3]);
+
         if (players.count(id))
         {
-            players[id].x = x;
-            players[id].y = y;
+            //store targetX/Y for smoothing
+            players[id].targetX = targetX;
+            players[id].targetY = targetY;
+
+            //teleport in worst case scenario
+            float dist = std::sqrt(std::pow(players[id].visualX - targetX, 2) + std::pow(players[id].visualY - targetY, 2));
+            if (dist > 5.0f)
+            {
+                players[id].visualX = targetX;
+                players[id].visualY = targetY;
+            }
         }
     }
     else if (cmd == "PLAYER_JOIN")
@@ -167,7 +177,7 @@ void Game::handleOneNetworkMessage(const std::string& msg)
         const int id = std::stoi(parts[1]);
         const float x = std::stof(parts[2]);
         const float y = std::stof(parts[3]);
-        players[id] = { id, x, y, false, "Player" + std::to_string(id) };
+        players[id] = { id, x, y, x, y, false, "Player" + std::to_string(id) };
         std::cout << "[SERVER] Player " << id << " joined\n";
     }
     else if (cmd == "PLAYER_LEAVE")
@@ -249,7 +259,8 @@ void Game::handleOneNetworkMessage(const std::string& msg)
     }
     else if (cmd == "INV_SYNC")
     {
-        constexpr int TOTAL_SLOTS = 40; //hardcoded because im lazy | change if java inventory size changes x
+        //TODO: hardcoded because im lazy | change if java inventory size changes in the future x
+        constexpr int TOTAL_SLOTS = 40;
         for (int i = 0; i < TOTAL_SLOTS; i++)
         {
             if (const int partIndex = 2 + (i * 2); partIndex + 1 < parts.size())
@@ -651,8 +662,8 @@ void Game::render(SDL_Renderer* renderer)
 
             for (auto& [id, p] : players)
             {
-                const float playerWorldX = p.x * World::TILE_PX_SIZE; //unscaled float for X/Y (tile coordinate * tile size)
-                const float playerWorldY = p.y * World::TILE_PX_SIZE;
+                const float playerWorldX = p.visualX * World::TILE_PX_SIZE; //unscaled float for X/Y (tile coordinate * tile size)
+                const float playerWorldY = p.visualY * World::TILE_PX_SIZE;
                 const int playerScreenX = static_cast<int>(std::floor(playerWorldX * zoom + cameraX));
                 const int playerScreenY = static_cast<int>(std::floor(playerWorldY * zoom + cameraY));
 
@@ -705,6 +716,14 @@ void Game::render(SDL_Renderer* renderer)
 
 void Game::update()
 {
+    float lerpSpeed = 0.15f; //lower = smoother but laggier | higher = snappier but more jitter
+    for (auto& [id, p] : players)
+    {
+        //move current x/y to targetX/Y gradually
+        p.visualX += (p.targetX - p.visualX) * lerpSpeed;
+        p.visualY += (p.targetY - p.visualY) * lerpSpeed;
+    }
+
     if (isFreecamActive)
     {
         float currentScreenX = camera.getPreciseX();
@@ -726,8 +745,8 @@ void Game::update()
     {
         //p.x and p.y are tile coordinates. convert them to pixel center coordinates.
         const auto& p = players[localPlayerId];
-        const float playerCentreX = p.x * World::TILE_PX_SIZE + World::TILE_PX_SIZE / 2.0f;
-        const float playerCentreY = p.y * World::TILE_PX_SIZE + World::TILE_PX_SIZE / 2.0f;
+        const float playerCentreX = p.visualX * World::TILE_PX_SIZE + World::TILE_PX_SIZE / 2.0f;
+        const float playerCentreY = p.visualY * World::TILE_PX_SIZE + World::TILE_PX_SIZE / 2.0f;
 
         camera.setTarget(playerCentreX, playerCentreY);
     }

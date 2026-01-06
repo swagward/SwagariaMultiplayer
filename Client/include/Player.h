@@ -4,7 +4,8 @@
 struct Player
 {
     int id;
-    float x, y;
+    float visualX, visualY; //purely visual coordinates
+    float targetX, targetY; //actual server coords
     bool isLocal;
     std::string name = "Player";
 };

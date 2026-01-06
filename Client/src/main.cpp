@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
     game.setNetwork(&network);
 
     auto currentState = AppState::MENU;
-    std::string ipInput = "192.168.56.1"; // Pre-fill common local prefix
+    std::string ipInput = "192.168.56.1";
     bool isRunning = true;
     SDL_Event event;
 
@@ -52,7 +52,6 @@ int main(int argc, char* argv[])
     Uint32 fpsFrames = 0;
     float fps = 0.0f;
 
-    // Use SDL text input for the menu
     SDL_StartTextInput();
 
     while (isRunning) {
