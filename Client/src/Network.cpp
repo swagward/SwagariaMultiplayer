@@ -18,6 +18,8 @@ Network::~Network()
 
 bool Network::connectToServer(const std::string& host, const int port)
 {
+    std::cout << "[NETWORK] Attempting to connect to " << host << ":" << port << "..." << std::endl;
+
     IPaddress ip;
     if (SDLNet_ResolveHost(&ip, host.c_str(), port) < 0)
     {
@@ -25,16 +27,24 @@ bool Network::connectToServer(const std::string& host, const int port)
         return false;
     }
 
+    // This call is the one that "stalls" if the firewall drops the packet
     socket = SDLNet_TCP_Open(&ip);
+
     if (!socket)
     {
-        std::cerr << "[NETWORK] Failed to connect to " << host << ":" << port
-                  << " - " << SDLNet_GetError() << std::endl;
+        std::cerr << "[NETWORK] Connection failed. Potential causes: \n"
+                  << "1. Firewall blocking port " << port << " on Host\n"
+                  << "2. Players are on different subnets\n"
+                  << "3. Wrong IP address entered.\n"
+                  << "SDL_Net Error: " << SDLNet_GetError() << std::endl;
         return false;
     }
 
     connected = true;
-    std::cout << "[NETWORK] Connected to " << host << ":" << port << std::endl;
+    std::cout << "[NETWORK] Connected successfully!" << std::endl;
+
+    if (recvThread.joinable()) recvThread.join();
+    if (sendThread.joinable()) sendThread.join();
 
     recvThread = std::thread(&Network::receiveLoop, this);
     sendThread = std::thread(&Network::sendLoop, this);

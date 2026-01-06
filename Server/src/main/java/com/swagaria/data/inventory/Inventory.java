@@ -20,28 +20,16 @@ public class Inventory
         for (int i = 0; i < NUM_SLOTS; i++)
             slots[i] = new ItemSlot(null, 0);
 
-        //give player temp items
-        Item copperPickaxe = ItemRegistry.getByID(100);
-        Item copperAxe = ItemRegistry.getByID(101);
-        Item copperHammer = ItemRegistry.getByID(102);
+        //player's starting items
+        slots[0] = new ItemSlot(ItemRegistry.getByID(100), 1); //pickaxe
+        slots[1] = new ItemSlot(ItemRegistry.getByID(101), 1); //axe
+        slots[2] = new ItemSlot(ItemRegistry.getByID(102), 1); //hammer
 
-        Item grass = ItemRegistry.getByID(TileDefinition.ID_GRASS);
-        Item woodPlank = ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK);
-        Item woodPlankBG = ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK_BG);
-        Item torch = ItemRegistry.getByID(TileDefinition.ID_TORCH);
-
-
-        slots[0] = new ItemSlot(copperPickaxe, 1);
-        slots[1] = new ItemSlot(copperAxe, 1);
-        slots[2] = new ItemSlot(copperHammer, 1);
-
-        slots[3] = new ItemSlot(grass, 99);
-        slots[4] = new ItemSlot(woodPlank, 130);
-        slots[5] = new ItemSlot(woodPlankBG, 99);
-        slots[6] = new ItemSlot(torch, 54);
+        slots[3] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_GRASS), 999);
+        slots[4] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK), 999);
+        slots[5] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK_BG), 999);
+        slots[6] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_TORCH), 999);
     }
-
-    public int getNumSlots() { return NUM_SLOTS; }
 
     public ItemSlot getSlot(int index)
     {
@@ -49,6 +37,28 @@ public class Inventory
             return new ItemSlot(null, 0); //safely return empty slot
 
         return slots[index];
+    }
+
+    public void setSlot(int index, int itemID, int quantity)
+    {
+        if(index < 0 || index >= NUM_SLOTS) return;
+
+        if(itemID <= 0 || quantity <= 0)
+            slots[index] = new ItemSlot(null, 0);
+        else
+        {
+            Item itemDef = ItemRegistry.getByID(itemID);
+            if(itemDef != null)
+                slots[index] = new ItemSlot(itemDef, quantity);
+            else
+            {
+                slots[index] = new ItemSlot(null, 0);
+                System.err.println("[SERVER] Player " + owner.getId() + " tried to set slot " + index + " to unknown ID: " + itemID);
+            }
+        }
+
+        //no need to tell the client to update the inventory since
+        //they're the one who initiated the item move
     }
 
     public void addItem(int itemID, int quantity) {

@@ -16,12 +16,12 @@ public class ItemSlot
     public Item getItem() { return item; }
     public int getQuantity() { return quantity; }
 
-    public void setItem(Item newItem)
+/*    public void setItem(Item newItem)
     {
         item = newItem;
         if (newItem == null)
             quantity = 0;
-    }
+    }*/
 
     public void setQuantity(int newQuantity)
     {

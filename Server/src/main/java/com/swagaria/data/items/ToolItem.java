@@ -45,7 +45,6 @@ public class ToolItem extends Item
             if(requiredTool.requiredTool == this.toolType || requiredTool.requiredTool == ToolType.ANY)
                 isCorrectTool = true;
         }
-        else isCorrectTool = false;
 
         if (!isCorrectTool) {
             return false; //cannot continue.

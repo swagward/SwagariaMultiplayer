@@ -83,7 +83,6 @@ public class Server
                 ch.sendMessage(msg);
     }
 
-    //need method to send message to one client here
     public void sendMessageTo(String msg, int targetId)
     {
         ClientHandler ch = getClientHandler(targetId);

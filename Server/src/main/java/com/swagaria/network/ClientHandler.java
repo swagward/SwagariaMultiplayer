@@ -13,6 +13,7 @@ import com.swagaria.game.Chunk;
 import com.swagaria.game.World;
 
 import java.io.*;
+import java.net.Inet4Address;
 import java.net.Socket;
 
 public class ClientHandler implements Runnable
@@ -106,21 +107,40 @@ public class ClientHandler implements Runnable
 
     private void handleLine(String line)
     {
-        if (line == null || line.isEmpty())
-            return;
+        if (line == null || line.isEmpty()) return;
 
-        //USE_ITEM,<slotIndex>,<posX>,<posY>
+        //CMD_NAME,<VAR>,<VAR>,<VAR>...
         String[] parts = line.split(",", 5);
-        if (parts.length == 0)
-            return;
+        if (parts.length == 0) return;
 
         String cmd = parts[0].trim(); //trim just to be safe
-
         switch (cmd)
         {
             case "INPUT" -> handleInput(parts);
             case "USE_ITEM" -> handleUseItem(parts);
+            case "INV_MOVE_ITEM" -> handleMoveItem(parts);
             default -> System.out.println("[Server] Unknown command: " + line);
+        }
+    }
+
+    private void handleMoveItem(String[] parts)
+    {
+        if(parts.length < 4) return;
+
+        try
+        {
+            int slotIndex = Integer.parseInt(parts[1].trim());
+            int itemID = Integer.parseInt(parts[2].trim());
+            int quantity = Integer.parseInt(parts[3].trim());
+
+            Player p = server.getPlayer(clientId);
+            if(p == null) return;
+
+            p.getInventory().setSlot(slotIndex, itemID, quantity);
+        }
+        catch (NumberFormatException e)
+        {
+            System.err.println("[SERVER] Bad INV_MOVE_ITEM command from player #" + clientId + ":" + e.getMessage());
         }
     }
 

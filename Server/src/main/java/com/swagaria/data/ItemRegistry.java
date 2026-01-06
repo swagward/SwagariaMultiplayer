@@ -4,7 +4,6 @@ import com.swagaria.data.items.Item;
 import com.swagaria.data.items.TileItem;
 import com.swagaria.data.items.ToolItem;
 import com.swagaria.data.items.ToolType;
-import com.swagaria.data.terrain.Tile;
 import com.swagaria.data.terrain.TileDefinition;
 import com.swagaria.data.terrain.TileLayer;
 

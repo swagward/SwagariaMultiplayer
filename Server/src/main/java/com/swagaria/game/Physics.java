@@ -7,7 +7,7 @@ public class Physics
     {
         float x = p.getX();
         float y = p.getY();
-        float vx = 0f;
+        float vx;
         float vy = p.getVy();
         boolean onGround = p.isOnGround();
 

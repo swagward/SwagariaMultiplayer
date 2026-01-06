@@ -249,11 +249,10 @@ void Game::handleOneNetworkMessage(const std::string& msg)
     }
     else if (cmd == "INV_SYNC")
     {
-        constexpr int TOTAL_SLOTS = 40; //hardcoded because im lazy
+        constexpr int TOTAL_SLOTS = 40; //hardcoded because im lazy | change if java inventory size changes x
         for (int i = 0; i < TOTAL_SLOTS; i++)
         {
-            const int partIndex = 2 + (i * 2);
-            if (partIndex + 1 < parts.size())
+            if (const int partIndex = 2 + (i * 2); partIndex + 1 < parts.size())
             {
                 try
                 {
@@ -336,6 +335,17 @@ void Game::handleInput(const SDL_Event& e)
                 else if (!targetSlot.isEmpty())
                 {
                     std::swap(targetSlot, heldItem);
+                }
+
+                //tell server it needs to rearrange the items otherwise big problems (items are only a visual update 🤬)
+                if (network)
+                {
+                    //if i was a mushroom id prolly say
+                    //"fuck my fungus life"
+                    //heh...thats a good one... *stares out the window, contemplating existence* what a life...
+                    std::ostringstream oss;
+                    oss << "INV_MOVE_ITEM," << targetSlotIndex << "," << targetSlot.itemID << "," << targetSlot.quantity;
+                    network->queueMessage(oss.str());
                 }
             }
         }
@@ -472,8 +482,11 @@ void Game::renderInventory(SDL_Renderer* renderer, const int winW, const int win
             constexpr int iconOffset = (SLOT_SIZE - iconSize) / 2;
             texManager.draw(renderer, slot.getTextureID(), x + iconOffset, y + iconOffset, iconSize, iconSize);
 
-            std::string itemQuantity = std::to_string(slot.quantity);
-            drawText(renderer, itemQuantity, x + SLOT_SIZE - static_cast<int>(itemQuantity.length()) * 10, y + SLOT_SIZE - 25, textColor);
+            if (slot.quantity > 1)
+            {
+                std::string itemQuantity = std::to_string(slot.quantity);
+                drawText(renderer, itemQuantity, x + SLOT_SIZE - static_cast<int>(itemQuantity.length()) * 10, y + SLOT_SIZE - 25, textColor);
+            }
         }
     }
 

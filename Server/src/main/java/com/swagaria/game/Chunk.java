@@ -43,12 +43,12 @@ public class Chunk
                 else if (worldY == surfaceY) //at surface
                 {
                     fgTypeId = TileDefinition.ID_GRASS;
-                    bgTypeId = TileDefinition.ID_DIRT_BG; // TODO: ADD DIRT WALLS HERE TOO!!!!!!
+                    bgTypeId = TileDefinition.ID_DIRT_BG;
                 }
                 else if (worldY > surfaceY - 3) //dirt layer
                 {
                     fgTypeId = TileDefinition.ID_DIRT;
-                    bgTypeId = TileDefinition.ID_DIRT_BG; //TODO: ADD DIRT WALLS!!!!!!
+                    bgTypeId = TileDefinition.ID_DIRT_BG;
                 }
                 else //stone layer
                 {
@@ -69,9 +69,6 @@ public class Chunk
             }
         }
     }
-
-    public int getChunkX() { return chunkX; }
-    public int getChunkY() { return chunkY; }
 
     public Tile getTile(int localX, int localY, int layer)
     {

@@ -63,7 +63,7 @@ public class TileDefinition
 
         TILE_REGISTRY.put(ID_GRASS, new TileDefinition(ID_GRASS, "Grass Block", TileLayer.FOREGROUND,
                 new CollisionComponent(true),
-                new DurabilityComponent(1, ID_GRASS),
+                new DurabilityComponent(1, ID_DIRT),
                 new RequiredToolComponent(ToolType.PICKAXE)
         ));
 

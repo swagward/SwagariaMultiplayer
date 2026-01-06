@@ -2,7 +2,7 @@
 #include <array>
 #include "Tile.h"
 
-namespace TileLayer //i hate this
+namespace TileLayer
 {
     static constexpr int FOREGROUND = 0;
     static constexpr int BACKGROUND = 1;
@@ -14,8 +14,7 @@ class Chunk
 public:
     static constexpr int SIZE = 16;
     int chunkX, chunkY;
-    //TODO: FIX THIS!!!!!!! MAKE THIS BETTER
-    std::array<std::array<std::array<Tile, TileLayer::NUM_LAYERS>, SIZE>, SIZE> tiles; //this too. i fucking hate this
+    std::array<std::array<std::array<Tile, TileLayer::NUM_LAYERS>, SIZE>, SIZE> tiles; //i fucking hate this
 
     Chunk(const int cx, const int cy) : chunkX(cx), chunkY(cy) {}
 
