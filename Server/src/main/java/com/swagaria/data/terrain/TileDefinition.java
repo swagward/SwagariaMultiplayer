@@ -23,6 +23,7 @@ public class TileDefinition
     public static final int ID_WOOD_PLANK_BG = 7;
     public static final int ID_STONE_BG = 8;
     public static final int ID_DIRT_BG = 9;
+    public static final int ID_LEAVES = 10;
 
     public final int typeID;
     public final String name;
@@ -79,7 +80,7 @@ public class TileDefinition
                 new RequiredToolComponent(ToolType.PICKAXE)
         ));
 
-        TILE_REGISTRY.put(ID_WOOD_LOG, new TileDefinition(ID_WOOD_LOG, "Wood Log", TileLayer.FOREGROUND,
+        TILE_REGISTRY.put(ID_WOOD_LOG, new TileDefinition(ID_WOOD_LOG, "Wood Log", TileLayer.BACKGROUND,
                 new CollisionComponent(false),
                 new DurabilityComponent(2, ID_WOOD_LOG),
                 new RequiredToolComponent(ToolType.AXE)
@@ -114,6 +115,12 @@ public class TileDefinition
                 new CollisionComponent(false),
                 new DurabilityComponent(1, ID_DIRT_BG),
                 new RequiredToolComponent(ToolType.HAMMER)
+        ));
+
+        TILE_REGISTRY.put(ID_LEAVES, new TileDefinition(ID_LEAVES, "Leaves", TileLayer.FOREGROUND,
+                new CollisionComponent(false),
+                new DurabilityComponent(2, ID_LEAVES),
+                new RequiredToolComponent(ToolType.AXE)
         ));
     }
 

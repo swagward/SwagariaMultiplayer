@@ -29,6 +29,7 @@ public class Inventory
         slots[4] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK), 999);
         slots[5] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK_BG), 999);
         slots[6] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_TORCH), 999);
+        slots[7] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_LEAVES), 999);
     }
 
     public ItemSlot getSlot(int index)

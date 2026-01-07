@@ -5,18 +5,22 @@ import com.swagaria.data.terrain.Tile;
 import com.swagaria.data.terrain.TileDefinition;
 import com.swagaria.data.terrain.TileLayer;
 
+import java.util.Random;
+
 public class Chunk
 {
     public static final int SIZE = TerrainConfig.CHUNK_SIZE;
     private final int chunkX;
     private final int chunkY;
     private final Tile[][][] tiles;
+    private final Random random;
 
     public Chunk(int chunkX, int chunkY)
     {
         this.chunkX = chunkX;
         this.chunkY = chunkY;
         this.tiles = new Tile[SIZE][SIZE][TileLayer.NUM_LAYERS];
+        this.random = new Random(TerrainConfig.SEED + (long) chunkX * 31337 + (long) chunkY * 713);
         generate();
     }
 
@@ -66,6 +70,74 @@ public class Chunk
 
                 tiles[x][y][TileLayer.FOREGROUND] = new Tile(fgTypeId);
                 tiles[x][y][TileLayer.BACKGROUND] = new Tile(bgTypeId);
+            }
+        }
+        generateTrees();
+    }
+
+    private void generateTrees()
+    {
+        int minSpacing = 4; // Slightly more space for the leaf canopy
+        int treeBuffer = 0;
+
+        for (int x = 1; x < SIZE - 1; x++) // Bounds check so leaves don't spill out of array
+        {
+            if (treeBuffer > 0) {
+                treeBuffer--;
+                continue;
+            }
+
+            for (int y = 0; y < SIZE - 8; y++) // Ensure height for the trunk + leaves
+            {
+                Tile currentTile = tiles[x][y][TileLayer.FOREGROUND];
+                Tile aboveTile = tiles[x][y + 1][TileLayer.FOREGROUND];
+
+                if (currentTile.getTypeId() == TileDefinition.ID_GRASS &&
+                        aboveTile.getTypeId() == TileDefinition.ID_AIR)
+                {
+                    if (random.nextDouble() < TerrainConfig.TREE_CHANCE)
+                    {
+                        growTree(x, y + 1);
+                        treeBuffer = minSpacing;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    private void growTree(int startX, int startY) {
+        int height = 4 + random.nextInt(3); // Random 4, 5, or 6
+
+        // 1. Grow Trunk
+        for (int i = 0; i < height; i++) {
+            int currentY = startY + i;
+            if (currentY < SIZE) {
+                tiles[startX][currentY][TileLayer.FOREGROUND].setTypeId(TileDefinition.ID_WOOD_LOG);
+            }
+        }
+
+        // 2. Add Leaves at the top
+        int topY = startY + height - 1;
+
+        // Simple cross/diamond canopy around the top log
+        // (x, y+1), (x, y-1), (x+1, y), (x-1, y)
+        int[][] leafOffsets = {
+                {0, 1}, {0, -1}, {1, 0}, {-1, 0}, // Cardinal
+                {1, 1}, {-1, 1}, {1, -1}, {-1, -1} // Diagonals for a bushier look
+        };
+
+        for (int[] offset : leafOffsets) {
+            int leafX = startX + offset[0];
+            int leafY = topY + offset[1];
+
+            // Boundary checks
+            if (leafX >= 0 && leafX < SIZE && leafY >= 0 && leafY < SIZE) {
+                Tile leafTile = tiles[leafX][leafY][TileLayer.FOREGROUND];
+                // Only place leaves in air so we don't overwrite the trunk
+                if (leafTile.getTypeId() == TileDefinition.ID_AIR) {
+                    leafTile.setTypeId(TileDefinition.ID_LEAVES);
+                }
             }
         }
     }

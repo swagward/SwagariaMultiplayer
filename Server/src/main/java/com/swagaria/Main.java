@@ -6,7 +6,7 @@ public class Main
 {
     public static void main(String[] args)
     {
-        int port = 25565; //default port for the server
+        int port = 25565; //default port for the servers
         System.out.println("[Server] Starting Swagaria server on port " + port + "...");
 
         try

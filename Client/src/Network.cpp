@@ -6,8 +6,6 @@ Network::Network()
 {
     if (SDLNet_Init() < 0)
         std::cerr << "[SDL_NET] failed to initialize: " << SDLNet_GetError() << std::endl;
-    else
-        std::cout << "[SDL_NET] Initialized successfully\n";
 }
 
 Network::~Network()

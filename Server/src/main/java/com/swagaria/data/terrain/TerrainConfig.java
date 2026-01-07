@@ -14,6 +14,8 @@ public class TerrainConfig
     public static final double NOISE_AMP = 10.0;
     public static final double BASE_HEIGHT = 40.0;
 
+    public static final double TREE_CHANCE = 0.15;
+
     public static final long SEED = System.currentTimeMillis();
     public static final OpenSimplexNoise NOISE = new OpenSimplexNoise(SEED);
 }

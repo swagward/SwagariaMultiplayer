@@ -29,6 +29,7 @@ public class ItemRegistry
         ITEM_REGISTRY.put(TileDefinition.ID_WOOD_PLANK_BG, new TileItem(TileDefinition.ID_WOOD_PLANK_BG, "Wood Plank BG", 999, TileDefinition.ID_WOOD_PLANK_BG));
         ITEM_REGISTRY.put(TileDefinition.ID_STONE_BG, new TileItem(TileDefinition.ID_STONE_BG, "Stone BG", 999, TileDefinition.ID_STONE_BG));
         ITEM_REGISTRY.put(TileDefinition.ID_DIRT_BG, new TileItem(TileDefinition.ID_DIRT_BG, "Dirt BG", 999, TileDefinition.ID_DIRT_BG));
+        ITEM_REGISTRY.put(TileDefinition.ID_LEAVES, new TileItem(TileDefinition.ID_DIRT_BG, "Leaves", 999, TileDefinition.ID_LEAVES));
 
         //tool items (100-199)
         ITEM_REGISTRY.put(100, new ToolItem(100, "Copper Pickaxe", 1, 3, ToolType.PICKAXE, TileLayer.FOREGROUND));

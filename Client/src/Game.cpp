@@ -20,8 +20,6 @@ Game::Game() : camera(800, 600)
         font = TTF_OpenFont("assets/fonts/Andy Bold.ttf", 24);
         if (!font)
             std::cerr << "[SDL_TTF] Failed to load font: " << TTF_GetError() << std::endl;
-        else
-            std::cout << "[SDL_TTF] Font loaded successfully.\n";
     }
 
     world = std::make_unique<World>();
@@ -338,15 +336,12 @@ void Game::handleInput(const SDL_Event& e)
                         }
                     }
                     else
-                    {
                         //handles dropping into empty slot/swapping two different stacks
                         std::swap(targetSlot, heldItem);
-                    }
                 }
                 else if (!targetSlot.isEmpty())
-                {
                     std::swap(targetSlot, heldItem);
-                }
+
 
                 //tell server it needs to rearrange the items otherwise big problems (items are only a visual update 🤬)
                 if (network)
@@ -630,16 +625,17 @@ void Game::render(SDL_Renderer* renderer)
 
                         switch (type)
                         {
-                            case 1: textureId = "grass"; break;
-                            case 2: textureId = "dirt"; break;
-                            case 3: textureId = "stone"; break;
-                            case 4: textureId = "wood_log"; break;
-                            case 5: textureId = "torch"; break;
-                            case 6: textureId = "wood_plank"; break;
-                            case 7: textureId = "wood_plank_bg"; break;
-                            case 8: textureId = "stone_bg"; break;
-                            case 9: textureId = "dirt_bg"; break;
-                            default: textureId = "missing_texture"; break;
+                        case 1: textureId = "grass"; break;
+                        case 2: textureId = "dirt"; break;
+                        case 3: textureId = "stone"; break;
+                        case 4: textureId = "wood_log"; break;
+                        case 5: textureId = "torch"; break;
+                        case 6: textureId = "wood_plank"; break;
+                        case 7: textureId = "wood_plank_bg"; break;
+                        case 8: textureId = "stone_bg"; break;
+                        case 9: textureId = "dirt_bg"; break;
+                        case 10: textureId = "leaves"; break;
+                        default: textureId = "missing_texture"; break;
                         }
 
                         if (layer == TileLayer::BACKGROUND)
@@ -654,15 +650,17 @@ void Game::render(SDL_Renderer* renderer)
                 }
             }
         }
+        //errors:
+        //placing leaves in different slot then placing in world turns them into dirt walls
+        //trees look weird to change
 
         if (layer == TileLayer::BACKGROUND)
         {
-            //render all players
             const int originalScaledTilePxSize = static_cast<int>(std::round(World::TILE_PX_SIZE * zoom));
 
             for (auto& [id, p] : players)
             {
-                const float playerWorldX = p.visualX * World::TILE_PX_SIZE; //unscaled float for X/Y (tile coordinate * tile size)
+                const float playerWorldX = p.visualX * World::TILE_PX_SIZE;
                 const float playerWorldY = p.visualY * World::TILE_PX_SIZE;
                 const int playerScreenX = static_cast<int>(std::floor(playerWorldX * zoom + cameraX));
                 const int playerScreenY = static_cast<int>(std::floor(playerWorldY * zoom + cameraY));
@@ -671,23 +669,29 @@ void Game::render(SDL_Renderer* renderer)
                 {
                     playerScreenX,
                     playerScreenY,
-                    originalScaledTilePxSize, //player width in scaled pixels (1 tile wide)
-                    originalScaledTilePxSize * 2 //player height in scaled pixels (2 tiles tall)
+                    originalScaledTilePxSize,
+                    originalScaledTilePxSize * 2
                 };
 
-                if (p.isLocal)
-                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); //draw local client as blue
-                else
-                    SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255); //everyone else draw yellow
-
+                //player colour
+                SDL_SetRenderDrawColor(renderer, p.color.r, p.color.g, p.color.b, 255);
                 SDL_RenderFillRect(renderer, &rect);
+
+                //outline
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+                SDL_RenderDrawRect(renderer, &rect);
+
+                //name display
+                if (!p.name.empty()) {
+                    int textX = playerScreenX + (originalScaledTilePxSize / 2) - (p.name.length() * 5);
+                    int textY = playerScreenY - 25;
+                    drawText(renderer, p.name, textX, textY, { 255, 255, 255, 255 });
+                }
             }
         }
     }
 
     constexpr int margin = 10;
-    SDL_Color textColor = { 255, 255, 255, 255 };
-
     renderInventory(renderer, winW, winH);
 
     //zoom text set to 2 decimal places
@@ -695,7 +699,7 @@ void Game::render(SDL_Renderer* renderer)
     zoomOss.precision(2);
     zoomOss << std::fixed << zoom;
     std::string zoomText = "Zoom: x" + zoomOss.str();
-    drawText(renderer, zoomText, winW - 125, margin + 8, textColor);
+    drawText(renderer, zoomText, winW - 125, margin + 8, { 255, 255, 255, 255 });
 
     if (isFreecamActive)
     {
@@ -716,7 +720,7 @@ void Game::render(SDL_Renderer* renderer)
 
 void Game::update()
 {
-    float lerpSpeed = 0.15f; //lower = smoother but laggier | higher = snappier but more jitter
+    float lerpSpeed = 0.9f; //lower = smoother but laggier | higher = snappier but more jitter
     for (auto& [id, p] : players)
     {
         //move current x/y to targetX/Y gradually
