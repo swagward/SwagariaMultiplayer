@@ -16,7 +16,7 @@ void Inventory::updateSlot(const int  index, const int  ID, const int quantity)
         slots[index].quantity = quantity;
 
         const auto& def = ItemRegistry::getInstance().getDefinition(ID);
-        std::cout << "[INVENTORY] Slot " << index << " updated to: " << def.name << " (Qty: " << quantity << ")\n";
+        //std::cout << "[INVENTORY] Slot " << index << " updated to: " << def.name << " (Qty: " << quantity << ")\n";
     }
 }
 

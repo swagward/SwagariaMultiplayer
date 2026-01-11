@@ -10,6 +10,7 @@
 #include "World.h"
 #include "Camera.h"
 #include "Inventory.h"
+#include "ParticleManager.h"
 
 class Network;
 
@@ -32,12 +33,14 @@ public:
     void setLocalPlayerId(const int id) { localPlayerId = id; }
 
     void drawText(SDL_Renderer* renderer, const std::string& text, int x, int y, SDL_Color color) const;
+    static std::string getTextureIDFromType(int type);
 
 private:
     Network* network = nullptr;
     std::unique_ptr<World> world;
     Camera camera = Camera(800, 600);
     TTF_Font* font = nullptr;
+    std::unique_ptr<ParticleManager> particleManager;
 
     int localPlayerId = -1;
     std::unordered_map<int, Player> players;

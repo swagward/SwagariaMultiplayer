@@ -13,7 +13,6 @@ import com.swagaria.game.Chunk;
 import com.swagaria.game.World;
 
 import java.io.*;
-import java.net.Inet4Address;
 import java.net.Socket;
 
 public class ClientHandler implements Runnable
@@ -79,7 +78,8 @@ public class ClientHandler implements Runnable
                     out.flush();
                 }
                 System.out.println("[Server] Sent " + server.getWorld().getAllChunks().size() + " chunks to player #" + clientId);
-            } catch (Exception e)
+            }
+            catch (Exception e)
             {
                 //client probably disconnected while sending messages, log message and stop
                 System.err.println("[Server] Exception while sending chunks to player #" + clientId + ": " + e.getMessage());
@@ -94,7 +94,8 @@ public class ClientHandler implements Runnable
             while (running && (line = in.readLine()) != null)
                 handleLine(line);
 
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             System.err.println("[Server] Connection error with player #" + clientId + ": " + e.getMessage());
         }
@@ -175,8 +176,8 @@ public class ClientHandler implements Runnable
             {
                 if(item instanceof TileItem tileItem)
                 {
-                    TileDefinition def = TileDefinition.getDefinition(tileItem.getTileTypeID());
-                    String updateMsg = "UPDATE_TILE," + worldX + "," + worldHeightFlipped + "," + tileItem.getTileTypeID() + "," + def.layerToPlace;
+                    TileDefinition def = TileDefinition.getDefinition(tileItem.getTileID());
+                    String updateMsg = "UPDATE_TILE," + worldX + "," + worldHeightFlipped + "," + tileItem.getTileID() + "," + def.layerToPlace;
                     server.broadcast(updateMsg);
                 }
                 else if(item instanceof ToolItem toolItem)
@@ -199,26 +200,28 @@ public class ClientHandler implements Runnable
         //torch rule
         if (tileToPlaceId == TileDefinition.ID_TORCH)
         {
-            //fuck my chud life
             //check if foreground block is below
-            int blockBelow = world.getTileAt(x, y + 1, TileLayer.FOREGROUND).getTypeId();
+            int blockBelow = world.getTileAt(x, y + 1, TileLayer.FOREGROUND).getTileID();
             if (blockBelow != TileDefinition.ID_AIR) return true;
 
             //check if background block is behind
-            int wallBehind = world.getTileAt(x, y, TileLayer.BACKGROUND).getTypeId();
+            int wallBehind = world.getTileAt(x, y, TileLayer.BACKGROUND).getTileID();
             if (wallBehind != TileDefinition.ID_AIR) return true;
 
             return false;
         }
 
         int[][] neighbours = {
-                {x - 1, y}, {x + 1, y}, {x, y - 1}, {x, y + 1}
+                {x - 1, y},
+                {x + 1, y},
+                {x    , y - 1},
+                {x    , y + 1}
         };
 
         for (int[] pos : neighbours)
         {
-            int fgNeighbourID = world.getTileAt(pos[0], pos[1], TileLayer.FOREGROUND).getTypeId();
-            int bgNeighbourID = world.getTileAt(pos[0], pos[1], TileLayer.BACKGROUND).getTypeId();
+            int fgNeighbourID = world.getTileAt(pos[0], pos[1], TileLayer.FOREGROUND).getTileID();
+            int bgNeighbourID = world.getTileAt(pos[0], pos[1], TileLayer.BACKGROUND).getTileID();
 
             if(fgNeighbourID != TileDefinition.ID_AIR || bgNeighbourID != TileDefinition.ID_AIR)
                 return true;

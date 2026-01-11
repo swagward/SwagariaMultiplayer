@@ -2,22 +2,22 @@ package com.swagaria.data.terrain;
 
 public class Tile
 {
-    private int typeId;
+    private int tileID;
 
     public Tile(int typeId)
     {
-        this.typeId = typeId;
+        this.tileID = typeId;
     }
-    public int getTypeId()
+    public int getTileID()
     {
-        return typeId;
+        return tileID;
     }
-    public void setTypeId(int typeId)
+    public void setTileID(int tileID)
     {
-        this.typeId = typeId;
+        this.tileID = tileID;
     }
     public TileDefinition getDefinition()
     {
-        return TileDefinition.getDefinition(typeId);
+        return TileDefinition.getDefinition(tileID);
     }
 }

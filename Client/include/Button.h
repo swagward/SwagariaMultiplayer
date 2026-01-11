@@ -1,8 +1,5 @@
 #pragma once
-#include "SDL_image.h"
 #include "Game.h"
-#include "Network.h"
-#include "TextureManager.h"
 
 struct Button
 {
@@ -11,13 +8,13 @@ struct Button
     SDL_Color colour;
     SDL_Color hoverColour;
 
-    bool isHovering(int mouseX, int mouseY)
+    [[nodiscard]] bool isHovering(const int mouseX, const int mouseY) const
     {
         return mouseX >= buttonRect.x && mouseX <= buttonRect.x + buttonRect.w &&
             mouseY >= buttonRect.y && mouseY <= buttonRect.y + buttonRect.h;
     }
 
-    void render(SDL_Renderer* renderer, Game& game, int mouseX, int mouseY)
+    void render(SDL_Renderer* renderer, const Game& game, const int mouseX, const int mouseY) const
     {
         SDL_SetRenderDrawColor(renderer, 40, 40, 45, 255);
         if (isHovering(mouseX, mouseY))
@@ -28,8 +25,8 @@ struct Button
         SDL_RenderDrawRect(renderer, &buttonRect);
 
         //centre the text in the button
-        int textX = buttonRect.x + (buttonRect.w / 2) - (text.length() * 6);
-        int textY = buttonRect.y + (buttonRect.h / 2) - 12;
+        const int textX = buttonRect.x + buttonRect.w / 2 - text.length() * 6;
+        const int textY = buttonRect.y + buttonRect.h / 2 - 12;
         game.drawText(renderer, text, textX, textY, {255, 255, 255, 255});
     }
 };

@@ -1,23 +1,12 @@
 #include "SDL_image.h"
 #include "SDL_mixer.h"
+#include "../include/AudioManager.h"
 #include "../include/Button.h"
 #include "../include/Game.h"
 #include "../include/Network.h"
 #include "../include/TextureManager.h"
 
 enum class AppState { MAIN_MENU, SETTINGS, IP_INPUT, CONNECTING, IN_GAME };
-/*std::string localUserName = "Player";
-SDL_Color playerColors[] = {
-    {255, 0, 0},             //red
-    {255, 255, 0, 255},   //yellow
-    {0, 255, 0, 255},     //green
-    {0, 255, 255, 255},   //cyan
-    {255, 100, 255, 255}, //pink
-    {255, 128, 0, 255},   //orange
-    {255, 0, 255},           //purple
-    {0, 255, 0}              //blue
-};
-int colorIndex = 0;*/
 
 int main(int argc, char* argv[])
 {
@@ -35,7 +24,7 @@ int main(int argc, char* argv[])
 
     SDL_Window* window = SDL_CreateWindow("Swagaria",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, 0);
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED /*| SDL_RENDERER_PRESENTVSYNC*/);
 
     //load tile textures
     TextureManager& texManager = TextureManager::getInstance();
@@ -50,6 +39,13 @@ int main(int argc, char* argv[])
     texManager.loadTexture("stone_bg", "assets/textures/tiles/stone_bg.png", renderer);
     texManager.loadTexture("dirt_bg", "assets/textures/tiles/dirt_bg.png", renderer);
     texManager.loadTexture("leaves", "assets/textures/tiles/leaves.png", renderer);
+    texManager.loadTexture("flowers", "assets/textures/tiles/flowers.png", renderer);
+    texManager.loadTexture("tall_grass", "assets/textures/tiles/tall_grass.png", renderer);
+    texManager.loadTexture("slate", "assets/textures/tiles/slate.png", renderer);
+    texManager.loadTexture("slate_bg", "assets/textures/tiles/slate_bg.png", renderer);
+    texManager.loadTexture("bedrock", "assets/textures/tiles/bedrock.png", renderer);
+    texManager.loadTexture("wood_platform", "assets/textures/tiles/wood_platform.png", renderer);
+    texManager.loadTexture("glass", "assets/textures/tiles/glass.png", renderer);
     //load item textures
     texManager.loadTexture("copper_pickaxe", "assets/textures/tools/copper_pickaxe.png", renderer);
     texManager.loadTexture("copper_axe", "assets/textures/tools/copper_axe.png", renderer);
@@ -57,7 +53,9 @@ int main(int argc, char* argv[])
     //load ui textures
     texManager.loadTexture("menu_bg", "assets/textures/ui/menu_bg.png", renderer);
     //load sfx & music
-    Mix_Chunk* buttonPress = Mix_LoadWAV("assets/audio/ui/button_pressed.wav");
+    AudioManager& audioManager = AudioManager::getInstance();
+    audioManager.loadSFX("button_press", "assets/audio/ui/button_pressed.wav");
+    audioManager.loadSFX("block_break", "assets/audio/game/block_break.wav");
 
     Network network;
     Game game;
@@ -88,10 +86,13 @@ int main(int argc, char* argv[])
         {
             if (event.type == SDL_QUIT) isRunning = false;
 
-            if (currentState != AppState::IN_GAME) {
-                if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+            if (currentState != AppState::IN_GAME)
+            {
+                if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
+                {
                     bool clicked = false;
-                    if (currentState == AppState::MAIN_MENU) {
+                    if (currentState == AppState::MAIN_MENU)
+                    {
                         if (playButton.isHovering(mouseX, mouseY))
                         {
                             currentState = AppState::IP_INPUT;
@@ -102,7 +103,8 @@ int main(int argc, char* argv[])
                             currentState = AppState::SETTINGS;
                             clicked = true;
                         }
-                        else if (quitButton.isHovering(mouseX, mouseY)) isRunning = false;
+                        else if (quitButton.isHovering(mouseX, mouseY))
+                            isRunning = false;
                     }
                     else if (currentState == AppState::SETTINGS || currentState == AppState::IP_INPUT)
                     {
@@ -118,22 +120,25 @@ int main(int argc, char* argv[])
                         }
                     }
 
-                    if (clicked && buttonPress) Mix_PlayChannel(-1, buttonPress, 0);
+                    if (clicked) audioManager.playSFX("button_press");
                 }
 
                 //ip input field
                 if (currentState == AppState::IP_INPUT)
                 {
-                    if (event.type == SDL_TEXTINPUT) ipInput += event.text.text;
+                    if (event.type == SDL_TEXTINPUT)
+                        ipInput += event.text.text;
                     else if (event.type == SDL_KEYDOWN)
                     {
-                        if (event.key.keysym.sym == SDLK_BACKSPACE && !ipInput.empty()) ipInput.pop_back();
+                        if (event.key.keysym.sym == SDLK_BACKSPACE && !ipInput.empty())
+                            ipInput.pop_back();
                         if (event.key.keysym.sym == SDLK_RETURN)
                         {
                             currentState = AppState::CONNECTING;
-                            if (buttonPress) Mix_PlayChannel(-1, buttonPress, 0);
+                            audioManager.playSFX("button_press");
                         }
-                        if (event.key.keysym.sym == SDLK_ESCAPE) currentState = AppState::MAIN_MENU;
+                        if (event.key.keysym.sym == SDLK_ESCAPE)
+                            currentState = AppState::MAIN_MENU;
                     }
                 }
             }
@@ -143,10 +148,12 @@ int main(int argc, char* argv[])
         SDL_SetRenderDrawColor(renderer, 20, 20, 25, 255);
         SDL_RenderClear(renderer);
 
-        if (currentState != AppState::IN_GAME) {
+        if (currentState != AppState::IN_GAME)
+        {
             texManager.draw(renderer, "menu_bg", 0, 0, 800, 600);
 
-            if (currentState == AppState::MAIN_MENU) {
+            if (currentState == AppState::MAIN_MENU)
+            {
                 game.drawText(renderer, "SWAGARIA", 340, 100, {255, 255, 0, 255});
                 playButton.render(renderer, game, mouseX, mouseY);
                 settingsButton.render(renderer, game, mouseX, mouseY);
@@ -156,6 +163,7 @@ int main(int argc, char* argv[])
             {
                 game.drawText(renderer, "SETTINGS", 340, 100, {255, 255, 255, 255});
                 game.drawText(renderer, "Sound Volume: [||||||||--] 80%", 250, 250, {200, 200, 200, 255});
+                game.drawText(renderer, "[Work In Progress]", 310, 300, {200, 0, 0, 255});
                 backButton.render(renderer, game, mouseX, mouseY);
             }
             else if (currentState == AppState::IP_INPUT)
@@ -171,18 +179,23 @@ int main(int argc, char* argv[])
                 game.drawText(renderer, "Connecting to " + ipInput + "...", 280, 300, {255, 255, 255, 255});
                 SDL_RenderPresent(renderer);
                 if (network.connectToServer(ipInput, 25565))
-                {
                     currentState = AppState::IN_GAME;
-                    //Mix_HaltMusic(); //stop menu music when entering game
-                }
-                else currentState = AppState::IP_INPUT;
+                else
+                    currentState = AppState::IP_INPUT;
             }
         }
         else
-            {
-            game.processNetworkMessages();
-            game.update();
-            game.render(renderer);
+        {
+            //check if still connected or not
+            if (!network.isConnected()) {
+                std::cout << "[CLIENT] Disconnected from server. Returning to menu." << std::endl;
+                currentState = AppState::MAIN_MENU;
+                network.disconnect(); //cleanup threads & socket
+            } else {
+                game.processNetworkMessages();
+                game.update();
+                game.render(renderer);
+            }
         }
 
         //fps counting in title bar
@@ -199,12 +212,8 @@ int main(int argc, char* argv[])
         }
 
         if (currentState != AppState::IN_GAME) SDL_RenderPresent(renderer);
-        SDL_Delay(10);
+        SDL_Delay(1);
     }
-
-    //audio cleanup
-    Mix_FreeChunk(buttonPress);
-    Mix_CloseAudio();
 
     network.disconnect();
     SDL_DestroyRenderer(renderer);

@@ -40,7 +40,7 @@ bool TextureManager::loadTexture(const std::string& id, const std::string& path,
     }
 
     textureMap[id] = texture;
-    std::cout << "[SDL_IMG] Texture " << id << " loaded" << std::endl;
+    //std::cout << "[SDL_IMG] Texture " << id << " loaded" << std::endl;
     return true;
 }
 

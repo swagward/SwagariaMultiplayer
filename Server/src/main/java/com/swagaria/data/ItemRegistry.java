@@ -29,14 +29,18 @@ public class ItemRegistry
         ITEM_REGISTRY.put(TileDefinition.ID_WOOD_PLANK_BG, new TileItem(TileDefinition.ID_WOOD_PLANK_BG, "Wood Plank BG", 999, TileDefinition.ID_WOOD_PLANK_BG));
         ITEM_REGISTRY.put(TileDefinition.ID_STONE_BG, new TileItem(TileDefinition.ID_STONE_BG, "Stone BG", 999, TileDefinition.ID_STONE_BG));
         ITEM_REGISTRY.put(TileDefinition.ID_DIRT_BG, new TileItem(TileDefinition.ID_DIRT_BG, "Dirt BG", 999, TileDefinition.ID_DIRT_BG));
-        ITEM_REGISTRY.put(TileDefinition.ID_LEAVES, new TileItem(TileDefinition.ID_DIRT_BG, "Leaves", 999, TileDefinition.ID_LEAVES));
+        ITEM_REGISTRY.put(TileDefinition.ID_LEAVES, new TileItem(TileDefinition.ID_LEAVES, "Leaves", 999, TileDefinition.ID_LEAVES));
+        ITEM_REGISTRY.put(TileDefinition.ID_TALL_GRASS, new TileItem(TileDefinition.ID_TALL_GRASS, "Tall Grass", 999, TileDefinition.ID_TALL_GRASS));
+        ITEM_REGISTRY.put(TileDefinition.ID_FLOWER, new TileItem(TileDefinition.ID_FLOWER, "Flowers", 999, TileDefinition.ID_FLOWER));
+        ITEM_REGISTRY.put(TileDefinition.ID_SLATE, new TileItem(TileDefinition.ID_SLATE, "Slate", 999, TileDefinition.ID_SLATE));
+        ITEM_REGISTRY.put(TileDefinition.ID_SLATE_BG, new TileItem(TileDefinition.ID_SLATE_BG, "Slate BG", 999, TileDefinition.ID_SLATE_BG));
+        ITEM_REGISTRY.put(TileDefinition.ID_WOOD_PLATFORM, new TileItem(TileDefinition.ID_WOOD_PLATFORM, "Wood Platform", 999, TileDefinition.ID_WOOD_PLATFORM));
+        ITEM_REGISTRY.put(TileDefinition.ID_GLASS, new TileItem(TileDefinition.ID_GLASS, "Glass", 999, TileDefinition.ID_GLASS));
 
         //tool items (100-199)
         ITEM_REGISTRY.put(100, new ToolItem(100, "Copper Pickaxe", 1, 3, ToolType.PICKAXE, TileLayer.FOREGROUND));
-        ITEM_REGISTRY.put(101, new ToolItem(101, "Copper Axe", 1, 2, ToolType.AXE, TileLayer.FOREGROUND));
+        ITEM_REGISTRY.put(101, new ToolItem(101, "Copper Axe", 1, 2, ToolType.AXE, TileLayer.BACKGROUND));
         ITEM_REGISTRY.put(102, new ToolItem(102, "Copper Hammer", 1, 1, ToolType.HAMMER, TileLayer.BACKGROUND));
-
-        Item.setRegistry(new ItemRegistry());
     }
 
     public static Item getByID(int itemID) { return ITEM_REGISTRY.get(itemID); }
@@ -52,7 +56,7 @@ public class ItemRegistry
 
             //add item-specific properties
             if(item instanceof TileItem tileItem)
-                sb.append(":T:").append(tileItem.getTileTypeID());
+                sb.append(":T:").append(tileItem.getTileID());
             else if(item instanceof ToolItem toolItem)
                 sb.append(":R:").append(toolItem.toolType.name()).append(":").append(toolItem.damage);
             else

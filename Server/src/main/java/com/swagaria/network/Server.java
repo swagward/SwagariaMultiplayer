@@ -7,6 +7,7 @@ import com.swagaria.game.World;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.*;
@@ -14,37 +15,50 @@ import java.util.*;
 public class Server
 {
     private final int port;
+    private final int playerLimit;
     private final ExecutorService pool = Executors.newCachedThreadPool();
     private final AtomicInteger idCounter = new AtomicInteger(1);
     private final Map<Integer, Player> players = new ConcurrentHashMap<>();
     private final List<ClientHandler> handlers = new CopyOnWriteArrayList<>();
     private final World world = new World();
-    private final boolean running = true;
+    private volatile boolean running = false;
+    private ServerSocket serverSocket;
+    private ScheduledExecutorService tickExecutor;
+    private long lastUpdateTime;
 
-    private final ScheduledExecutorService tickExecutor = Executors.newSingleThreadScheduledExecutor();
-    private long lastUpdateTime = System.nanoTime();
-
-    public Server(int port) { this.port = port; }
+    public Server(int port, int playerLimit)
+    {
+        this.port = port;
+        this.playerLimit = playerLimit;
+    }
 
     public void start() throws IOException
     {
-        try (ServerSocket ss = new ServerSocket(port))
+        running = true;
+
+        serverSocket = new ServerSocket(port);
+        System.out.println("[Server] Listening on port " + port);
+
+        tickExecutor = Executors.newSingleThreadScheduledExecutor();
+        lastUpdateTime = System.nanoTime();
+        tickExecutor.scheduleAtFixedRate(this::gameTick, 0, 16, TimeUnit.MILLISECONDS);
+
+        try
         {
-            System.out.println("[Server] Listening on port " + port);
-
-            // start tick loop
-            tickExecutor.scheduleAtFixedRate(this::gameTick, 0, 16, TimeUnit.MILLISECONDS);
-
             while (running)
             {
-                Socket sock = ss.accept();
-                int id = idCounter.getAndIncrement();
+                Socket sock = serverSocket.accept();
 
-                //spawn inside the world near center (tile units)
+                if (players.size() >= playerLimit)
+                {
+                    System.out.println("[Server] Connection rejected: Player limit reached.");
+                    sock.close();
+                    continue;
+                }
+
+                int id = idCounter.getAndIncrement();
                 int[] spawnTile = world.findSpawnTile();
-                float spawnX = spawnTile[0];  //horizontal center
-                float spawnY = spawnTile[1];  //just above surface
-                Player p = new Player(id, spawnX, spawnY, this);
+                Player p = new Player(id, (float)spawnTile[0], (float)spawnTile[1], this);
                 players.put(id, p);
 
                 ClientHandler h = new ClientHandler(sock, id, this);
@@ -54,28 +68,77 @@ public class Server
                 System.out.println("[Server] Player #" + id + " connected.");
             }
         }
+        catch (SocketException e)
+        {
+            if (running)
+            {
+                System.err.println("[Server] Socket Error: " + e.getMessage());
+            }
+        }
+        finally
+        {
+            cleanup();
+        }
+    }
+
+    public void stop()
+    {
+        running = false;
+        try
+        {
+            if (serverSocket != null && !serverSocket.isClosed())
+            {
+                serverSocket.close();
+            }
+        }
+        catch (IOException e)
+        {
+            System.err.println("[Server] Error closing socket: " + e.getMessage());
+        }
+    }
+
+    private void cleanup()
+    {
+        running = false;
+        if (tickExecutor != null)
+            tickExecutor.shutdown();
+
+        //disconnect all clients
+        for (ClientHandler h : handlers)
+        {
+            try
+            {
+                h.sendMessage("SERVER_SHUTDOWN");
+            }
+            catch (Exception ignored) { }
+        }
+
+        handlers.clear();
+        players.clear();
+
+        System.out.println("[Server] Shut down complete.");
     }
 
     public World getWorld() { return world; }
     public Collection<Player> getAllPlayers() { return players.values(); }
     public Player getPlayer(int id) { return players.get(id); }
-    public ClientHandler getClientHandler(int id) {
-        for (ClientHandler h : handlers) {
-            if (h.getClientId() == id) {
+
+    public ClientHandler getClientHandler(int id)
+    {
+        for (ClientHandler h : handlers)
+        {
+            if (h.getClientId() == id)
                 return h;
-            }
         }
         return null;
     }
 
-    //send message to all clients
     public void broadcast(String msg)
     {
         for (ClientHandler ch : handlers)
             ch.sendMessage(msg);
     }
 
-    //send message to all clients, excluding one
     public void broadcastExcept(String msg, int excludeId)
     {
         for (ClientHandler ch : handlers)
@@ -86,7 +149,7 @@ public class Server
     public void sendMessageTo(String msg, int targetId)
     {
         ClientHandler ch = getClientHandler(targetId);
-        ch.sendMessage(msg);
+        if (ch != null) ch.sendMessage(msg);
     }
 
     public void removeClient(int id, ClientHandler handler)

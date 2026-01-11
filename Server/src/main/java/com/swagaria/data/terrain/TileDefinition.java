@@ -24,16 +24,23 @@ public class TileDefinition
     public static final int ID_STONE_BG = 8;
     public static final int ID_DIRT_BG = 9;
     public static final int ID_LEAVES = 10;
+    public static final int ID_TALL_GRASS = 11;
+    public static final int ID_FLOWER = 12;
+    public static final int ID_SLATE = 13;
+    public static final int ID_SLATE_BG = 14;
+    public static final int ID_BEDROCK = 15;
+    public static final int ID_WOOD_PLATFORM = 16;
+    public static final int ID_GLASS = 17;
 
-    public final int typeID;
+    public final int tileID;
     public final String name;
     public final int layerToPlace;
 
     private final Map<Class<? extends TileComponent>, TileComponent> components = new HashMap<>();
 
-    private TileDefinition(int _typeID, String _name, int _layerToPlace, TileComponent... components)
+    private TileDefinition(int _tileID, String _name, int _layerToPlace, TileComponent... components)
     {
-        typeID = _typeID;
+        tileID = _tileID;
         name = _name;
         layerToPlace = _layerToPlace;
         for (TileComponent component : components) //lowkey this looks like python now
@@ -107,7 +114,7 @@ public class TileDefinition
 
         TILE_REGISTRY.put(ID_STONE_BG, new TileDefinition(ID_STONE_BG, "Stone Wall", TileLayer.BACKGROUND,
                 new CollisionComponent(false),
-                new DurabilityComponent(3, ID_STONE_BG),
+                new DurabilityComponent(4, ID_STONE_BG),
                 new RequiredToolComponent(ToolType.HAMMER)
         ));
 
@@ -119,13 +126,54 @@ public class TileDefinition
 
         TILE_REGISTRY.put(ID_LEAVES, new TileDefinition(ID_LEAVES, "Leaves", TileLayer.FOREGROUND,
                 new CollisionComponent(false),
-                new DurabilityComponent(2, ID_LEAVES),
-                new RequiredToolComponent(ToolType.AXE)
+                new DurabilityComponent(1, ID_LEAVES),
+                new RequiredToolComponent(ToolType.ANY)
+        ));
+
+        TILE_REGISTRY.put(ID_TALL_GRASS, new TileDefinition(ID_TALL_GRASS, "Tall Grass", TileLayer.FOREGROUND,
+                new CollisionComponent(false),
+                new DurabilityComponent(1, ID_TALL_GRASS),
+                new RequiredToolComponent(ToolType.ANY)
+        ));
+
+        TILE_REGISTRY.put(ID_FLOWER, new TileDefinition(ID_FLOWER, "Flowers", TileLayer.FOREGROUND,
+                new CollisionComponent(false),
+                new DurabilityComponent(1, ID_FLOWER),
+                new RequiredToolComponent(ToolType.ANY)
+        ));
+
+        TILE_REGISTRY.put(ID_SLATE, new TileDefinition(ID_SLATE, "Slate Block", TileLayer.FOREGROUND,
+                new CollisionComponent(true),
+                new DurabilityComponent(6, ID_SLATE),
+                new RequiredToolComponent(ToolType.PICKAXE)
+        ));
+
+        TILE_REGISTRY.put(ID_SLATE_BG, new TileDefinition(ID_SLATE_BG, "Slate Wall", TileLayer.BACKGROUND,
+                new CollisionComponent(true),
+                new DurabilityComponent(6, ID_SLATE_BG),
+                new RequiredToolComponent(ToolType.HAMMER)
+        ));
+
+        TILE_REGISTRY.put(ID_BEDROCK, new TileDefinition(ID_BEDROCK, "Bedrock", TileLayer.BACKGROUND,
+                new CollisionComponent(true)
+        ));
+
+        TILE_REGISTRY.put(ID_WOOD_PLATFORM, new TileDefinition(ID_WOOD_PLATFORM, "Wood Platform", TileLayer.FOREGROUND,
+                new CollisionComponent(true),
+                new DurabilityComponent(2, ID_WOOD_PLATFORM),
+                new RequiredToolComponent(ToolType.PICKAXE)
+        ));
+
+        TILE_REGISTRY.put(ID_GLASS, new TileDefinition(ID_GLASS, "Glass", TileLayer.FOREGROUND,
+                new CollisionComponent(true),
+                new DurabilityComponent(1, ID_GLASS),
+                new RequiredToolComponent(ToolType.PICKAXE)
         ));
     }
 
     //gets static tile definition based on ID
-    public static TileDefinition getDefinition(int id) {
+    public static TileDefinition getDefinition(int id)
+    {
         return TILE_REGISTRY.getOrDefault(id, TILE_REGISTRY.get(ID_AIR));
     }
 }

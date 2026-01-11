@@ -1,6 +1,5 @@
 package com.swagaria.data.items;
 
-import com.swagaria.data.components.DurabilityComponent;
 import com.swagaria.data.components.RequiredToolComponent;
 import com.swagaria.data.terrain.Tile;
 import com.swagaria.data.terrain.TileDefinition;
@@ -26,17 +25,10 @@ public class ToolItem extends Item
     {
         World world = caller.getServer().getWorld();
         Tile tile = world.getTileAt(posX, posY, layerToBreak);
-        if(tile == null || tile.getTypeId() == TileDefinition.ID_AIR)
+        if(tile == null || tile.getTileID() == TileDefinition.ID_AIR)
             return false; //nothing to break
 
-        TileDefinition def = TileDefinition.getDefinition(tile.getTypeId());
-        DurabilityComponent durability = def.getComponent(DurabilityComponent.class);
-        if(durability == null)
-        {
-            System.out.println("[SERVER] Tile + " + def.name + " is unbreakable");
-            return false; //tile is unbreakable
-        }
-
+        TileDefinition def = TileDefinition.getDefinition(tile.getTileID());
         RequiredToolComponent requiredTool = def.getComponent(RequiredToolComponent.class);
         boolean isCorrectTool = false;
 
@@ -46,13 +38,12 @@ public class ToolItem extends Item
                 isCorrectTool = true;
         }
 
-        if (!isCorrectTool) {
-            return false; //cannot continue.
-        }
+        if (!isCorrectTool)
+            return false; //cannot continue
 
         //remove tile and add to inventory
         world.setTileAt(posX, posY, layerToBreak, TileDefinition.ID_AIR);
-        int itemIDtoAdd = def.typeID;
+        int itemIDtoAdd = def.tileID;
         if(itemIDtoAdd != TileDefinition.ID_AIR)
             caller.getInventory().addItem(itemIDtoAdd, 1);
 

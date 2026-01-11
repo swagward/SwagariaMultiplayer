@@ -25,11 +25,23 @@ public class Inventory
         slots[1] = new ItemSlot(ItemRegistry.getByID(101), 1); //axe
         slots[2] = new ItemSlot(ItemRegistry.getByID(102), 1); //hammer
 
-        slots[3] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_GRASS), 999);
-        slots[4] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK), 999);
-        slots[5] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK_BG), 999);
-        slots[6] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_TORCH), 999);
-        slots[7] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_LEAVES), 999);
+        //give player every tile to build with. (no bedrock because they cant break it)
+        slots[3]  = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_GRASS), 999);
+        slots[4]  = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_DIRT), 999);
+        slots[5]  = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_STONE), 999);
+        slots[6]  = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_LOG), 999);
+        slots[7]  = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_TORCH), 999);
+        slots[8]  = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK), 999);
+        slots[9]  = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_PLANK_BG), 999);
+        slots[10] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_STONE_BG), 999);
+        slots[11] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_DIRT_BG), 999);
+        slots[12] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_LEAVES), 999);
+        slots[13] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_TALL_GRASS), 999);
+        slots[14] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_FLOWER), 999);
+        slots[15] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_SLATE), 999);
+        slots[16] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_SLATE_BG), 999);
+        slots[17] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_WOOD_PLATFORM), 999);
+        slots[18] = new ItemSlot(ItemRegistry.getByID(TileDefinition.ID_GLASS), 999);
     }
 
     public ItemSlot getSlot(int index)

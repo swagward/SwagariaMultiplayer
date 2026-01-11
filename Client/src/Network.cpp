@@ -16,6 +16,7 @@ Network::~Network()
 
 bool Network::connectToServer(const std::string& host, const int port)
 {
+    disconnect(); //clean up olds threads
     std::cout << "[NETWORK] Attempting to connect to " << host << ":" << port << "..." << std::endl;
 
     IPaddress ip;
@@ -128,3 +129,8 @@ void Network::sendLoop(){
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
+
+/*bool Network::isConnected() const
+{
+    return connected && socket != nullptr;
+}*/

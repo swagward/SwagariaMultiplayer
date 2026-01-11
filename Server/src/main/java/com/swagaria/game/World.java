@@ -22,16 +22,18 @@ public class World
 
     private void generate()
     {
-        System.out.println("[World] Generating " + TerrainConfig.WORLD_CHUNKS_X + "x" + TerrainConfig.WORLD_CHUNKS_Y + " chunks...");
         for (int cy = 0; cy < TerrainConfig.WORLD_CHUNKS_Y; cy++)
         {
             for (int cx = 0; cx < TerrainConfig.WORLD_CHUNKS_X; cx++)
             {
-                Chunk chunk = new Chunk(cx, cy);
+                Chunk chunk = new Chunk(cx, cy, this);
                 chunks[cx][cy] = chunk;
             }
         }
-        System.out.println("[World] Generation complete.");
+
+        for (int cy = 0; cy < TerrainConfig.WORLD_CHUNKS_Y; cy++)
+            for (int cx = 0; cx < TerrainConfig.WORLD_CHUNKS_X; cx++)
+                chunks[cx][cy].generateTrees();
     }
 
     public List<Chunk> getAllChunks()
@@ -72,13 +74,13 @@ public class World
         return chunk.getTile(localX, localY, layer);
     }
 
-    public boolean setTileAt(int worldX, int worldY, int layer, int tileTypeId)
+    public void setTileAt(int worldX, int worldY, int layer, int tileTypeId)
     {
+        //acts as the players way of placing tiles
         if (worldX < 0 || worldY < 0 ||
                 worldX >= TerrainConfig.WORLD_WIDTH ||
                 worldY >= TerrainConfig.WORLD_HEIGHT ||
-                layer < 0 || layer >= TileLayer.NUM_LAYERS)
-            return false;
+                layer < 0 || layer >= TileLayer.NUM_LAYERS) return;
 
         int realY = TerrainConfig.WORLD_HEIGHT - 1 - worldY;
 
@@ -87,30 +89,52 @@ public class World
 
         Chunk chunk = getChunk(chunkX, chunkY);
         if (chunk == null)
-            return false;
+            return;
 
         int localX = worldX % TerrainConfig.CHUNK_SIZE;
         int localY = realY % TerrainConfig.CHUNK_SIZE;
 
-        if (TileDefinition.getDefinition(tileTypeId).typeID == TileDefinition.ID_AIR && tileTypeId != TileDefinition.ID_AIR)
-            return false;
+        if (TileDefinition.getDefinition(tileTypeId).tileID == TileDefinition.ID_AIR && tileTypeId != TileDefinition.ID_AIR)
+            return;
 
         chunk.setTile(localX, localY, layer, tileTypeId);
-        return true;
     }
 
+    public void setTileGlobal(int worldX, int worldY, int layer, int tileID)
+    {
+        int chunkX = Math.floorDiv(worldX, Chunk.SIZE);
+        int chunkY = Math.floorDiv(worldY, Chunk.SIZE);
+
+        Chunk chunk = getChunk(chunkX, chunkY);
+        if(chunk != null)
+        {
+            int localX = Math.floorMod(worldX, Chunk.SIZE);
+            int localY = Math.floorMod(worldY, Chunk.SIZE);
+            chunk.setTile(localX, localY, layer, tileID);
+        }
+    }
+
+    //for collision
     public boolean isSolidTile(int worldX, int worldY)
     {
         Tile tile = getTileAt(worldX, worldY, TileLayer.FOREGROUND);
-        if (tile == null || tile.getTypeId() == TileDefinition.ID_AIR)
+        if (tile == null || tile.getTileID() == TileDefinition.ID_AIR)
             return false;
 
-        TileDefinition definition = tile.getDefinition();
+        if (tile.getTileID() == TileDefinition.ID_WOOD_PLATFORM) return false;
 
+        TileDefinition definition = tile.getDefinition();
         if (definition.hasComponent(CollisionComponent.class))
             return definition.getComponent(CollisionComponent.class).blocksMovement;
 
         return false; //default to no collision
+    }
+
+    public boolean isPlatformTile(int worldX, int worldY) {
+        Tile tile = getTileAt(worldX, worldY, TileLayer.FOREGROUND);
+        if (tile == null) return false;
+
+        return tile.getTileID() == TileDefinition.ID_WOOD_PLATFORM;
     }
 
     public int[] findSpawnTile()

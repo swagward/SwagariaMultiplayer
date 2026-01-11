@@ -11,11 +11,11 @@ public class Player
     private final Inventory inventory;
     private float lastX, lastY;
     private float vx = 0f, vy = 0f;
-    private boolean up = false, left = false, right = false;
+    private boolean up = false, left = false, right = false, down = false;
 
     //movement
     private static final float MOVE_SPEED = 6.0f;      //tiles/sec
-    private static final float JUMP_SPEED = 12.0f;     //tiles/sec
+    private static final float JUMP_SPEED = 15f;       //tiles/sec (5 = 1 block (ish))
     private static final float GRAVITY = 40.0f;        //tiles/sec^2 (down)
     private static final float MAX_FALL_SPEED = 50.0f; //terminal velocity
     private boolean onGround = false;
@@ -54,6 +54,7 @@ public class Player
     public boolean isMovingLeft() { return left; }
     public boolean isMovingRight() { return right; }
     public boolean isJumpPressed() { return up; }
+    public boolean isDownPressed() { return down; }
     public float getMoveSpeed() { return MOVE_SPEED; }
     public float getJumpSpeed() { return JUMP_SPEED; }
     public float getGravity() { return GRAVITY; }
@@ -70,6 +71,8 @@ public class Player
             case "LEFT_UP" -> left = false;
             case "RIGHT_DOWN" -> right = pressed;
             case "RIGHT_UP" -> right = false;
+            case "DOWN_DOWN" -> down = pressed;
+            case "DOWN_UP" -> down = false;
         }
     }
 

@@ -7,6 +7,9 @@
 #include <sstream>
 #include <iostream>
 
+#include "SDL_mixer.h"
+#include "../include/AudioManager.h"
+
 class TextureManager;
 
 Game::Game() : camera(800, 600)
@@ -23,6 +26,7 @@ Game::Game() : camera(800, 600)
     }
 
     world = std::make_unique<World>();
+    particleManager = std::make_unique<ParticleManager>();
 }
 
 Game::~Game()
@@ -66,17 +70,13 @@ void Game::handleOneNetworkMessage(const std::string& msg)
         return;
 
     if (const std::string& cmd = parts[0]; cmd == "ASSIGN_ID")
-    {
         localPlayerId = std::stoi(parts[1]);
-        std::cout << "[SERVER] Assigned id " << localPlayerId << std::endl;
-    }
     else if (cmd == "SPAWN")
     {
         const int id = std::stoi(parts[1]);
         const float x = std::stof(parts[2]);
         const float y = std::stof(parts[3]);
         players[id] = { id, x, y, x, y, id == localPlayerId, "Player" + std::to_string(id) };
-        std::cout << "[SERVER] Spawned player " << id << " at " << x << "," << y << std::endl;
     }
     else if (cmd == "ITEM_DEF_SYNC")
     {
@@ -110,16 +110,12 @@ void Game::handleOneNetworkMessage(const std::string& msg)
             itemDef.id = std::stoi(itemProps[0]);
             itemDef.name = itemProps[1];
             itemDef.maxStack = std::stoi(itemProps[2]);
-            std::string typeCode = itemProps[3];
 
-            std::string logMessage;
-
-            if (typeCode == "T")
+            if (std::string typeCode = itemProps[3]; typeCode == "T")
             {
                 if (itemProps.size() < 5) continue;
                 itemDef.isTile = true;
                 itemDef.tileTypeID = std::stoi(itemProps[4]);
-                logMessage = itemDef.name + " (ID: " + std::to_string(itemDef.id) + ", TileID: " + std::to_string(itemDef.tileTypeID) + ")";
             }
             else if (typeCode == "R")
             {
@@ -129,14 +125,11 @@ void Game::handleOneNetworkMessage(const std::string& msg)
 
                 const std::string& toolTypeName = itemProps[4];
                 const int damage = std::stoi(itemProps[5]);
-
-                logMessage = itemDef.name + " (ID: " + std::to_string(itemDef.id) + ", Type: " + toolTypeName + ", Damage: " + std::to_string(damage) + ")";
             }
             else
             {
                  itemDef.isTile = false;
                  itemDef.tileTypeID = 0;
-                 logMessage = itemDef.name + " (ID: " + std::to_string(itemDef.id) + ", Generic)";
             }
 
             // generate textureID from name
@@ -146,7 +139,6 @@ void Game::handleOneNetworkMessage(const std::string& msg)
             itemDef.textureID = name;
 
             ItemRegistry::getInstance().addDefinition(itemDef);
-            std::cout << "[SERVER] Loaded Item: " << logMessage << " texID: " << itemDef.textureID << std::endl;
         }
     }
     else if (cmd == "PLAYER_MOVE")
@@ -162,8 +154,7 @@ void Game::handleOneNetworkMessage(const std::string& msg)
             players[id].targetY = targetY;
 
             //teleport in worst case scenario
-            float dist = std::sqrt(std::pow(players[id].visualX - targetX, 2) + std::pow(players[id].visualY - targetY, 2));
-            if (dist > 5.0f)
+            if (float dist = std::sqrt(std::pow(players[id].visualX - targetX, 2) + std::pow(players[id].visualY - targetY, 2)); dist > 5.0f)
             {
                 players[id].visualX = targetX;
                 players[id].visualY = targetY;
@@ -222,7 +213,6 @@ void Game::handleOneNetworkMessage(const std::string& msg)
         if (!world) return;
         if (parts.size() < 5) return;
 
-        //coordinate conversions to get the tile the mouse is hovering over
         const int worldX = std::stoi(parts[1]);
         const int topDownWorldY = std::stoi(parts[2]);
         const int newTileType = std::stoi(parts[3]);
@@ -230,15 +220,33 @@ void Game::handleOneNetworkMessage(const std::string& msg)
 
         if (layerIndex < 0 || layerIndex >= TileLayer::NUM_LAYERS) return;
 
+        constexpr int worldWidthInTiles = World::WORLD_WIDTH_IN_CHUNKS * Chunk::SIZE;
         constexpr int worldHeightInTiles = World::WORLD_HEIGHT_IN_CHUNKS * Chunk::SIZE;
+
+        //stop out of bounds
+        if (worldX < 0 || worldX >= worldWidthInTiles || topDownWorldY < 0 || topDownWorldY >= worldHeightInTiles)
+            return;
+
         const int bottomUpWorldY = worldHeightInTiles - 1 - topDownWorldY;
         const int chunkX = static_cast<int>(std::floor(static_cast<float>(worldX) / Chunk::SIZE));
         const int chunkY_BottomUp = static_cast<int>(std::floor(static_cast<float>(bottomUpWorldY) / Chunk::SIZE));
-        const int fixedChunkY = chunkY_BottomUp;
+
+        //another oob check
+        if (chunkX < 0 || chunkX >= World::WORLD_WIDTH_IN_CHUNKS || chunkY_BottomUp < 0 || chunkY_BottomUp >= World::WORLD_HEIGHT_IN_CHUNKS)
+            return;
+
         const int tileX = (worldX % Chunk::SIZE + Chunk::SIZE) % Chunk::SIZE;
         const int tileY_BottomUp = (bottomUpWorldY % Chunk::SIZE + Chunk::SIZE) % Chunk::SIZE;
 
-        if (Chunk* chunk = world->getChunk(chunkX, fixedChunkY))
+        if (newTileType == 0)
+        {
+            if (Chunk* chunk = world->getChunk(chunkX, chunkY_BottomUp))
+                if (int prevBlock = chunk->getTile(tileX, tileY_BottomUp, layerIndex).type; prevBlock != 0)
+                    particleManager->spawnEffect(static_cast<float>(worldX), static_cast<float>(topDownWorldY), getTextureIDFromType(prevBlock));
+            AudioManager::getInstance().playSFX("block_break");
+        }
+
+        if (Chunk* chunk = world->getChunk(chunkX, chunkY_BottomUp))
             chunk->setTile(tileX, tileY_BottomUp, layerIndex, newTileType);
     }
     else if (cmd == "INV_UPDATE")
@@ -346,9 +354,6 @@ void Game::handleInput(const SDL_Event& e)
                 //tell server it needs to rearrange the items otherwise big problems (items are only a visual update 🤬)
                 if (network)
                 {
-                    //if i was a mushroom id prolly say
-                    //"fuck my fungus life"
-                    //heh...thats a good one... *stares out the window, contemplating existence* what a life...
                     std::ostringstream oss;
                     oss << "INV_MOVE_ITEM," << targetSlotIndex << "," << targetSlot.itemID << "," << targetSlot.quantity;
                     network->queueMessage(oss.str());
@@ -412,8 +417,12 @@ void Game::handleInput(const SDL_Event& e)
         const int tileY = static_cast<int>(std::floor(mouseWorldY / World::TILE_PX_SIZE));
 
         //conversion for sdl2 (top-down) & java/server Y origin (bottom-up)
+        constexpr int worldWidthInTiles = World::WORLD_WIDTH_IN_CHUNKS * Chunk::SIZE;
         constexpr int worldHeightInTiles = World::WORLD_HEIGHT_IN_CHUNKS * Chunk::SIZE;
         const int tileYFlipped = worldHeightInTiles - 1 - tileY;
+
+        if (tileX <= 0 || tileX >= worldWidthInTiles - 1 || tileYFlipped <= 0 || tileYFlipped >= worldHeightInTiles - 1)
+            return;
 
         std::ostringstream oss;
         oss << "USE_ITEM," << slotIndex << "," << tileX << "," << tileYFlipped;
@@ -504,13 +513,13 @@ void Game::renderInventory(SDL_Renderer* renderer, const int winW, const int win
 
         const auto& heldSlot = inventory.mouseHeldItem;
 
-        // Draw the item texture centered on the mouse cursor
+        //draw item centred
         constexpr int iconSize = static_cast<int>(SLOT_SIZE * 0.75f);
         texManager.draw(renderer, heldSlot.getTextureID(),
                         mouseX - iconSize / 2, mouseY - iconSize / 2,
                         iconSize, iconSize);
 
-        // Draw quantity text next to the held item
+        //draw quantity next to item
         const std::string heldItemQuantity = std::to_string(heldSlot.quantity);
         drawText(renderer, heldItemQuantity,
                  mouseX + iconSize / 2 + 5, mouseY - 15, // Offset slightly from the center/right of the icon
@@ -531,12 +540,10 @@ int Game::getSlotIndexAt(const int mouseX, const int mouseY, const int winW, con
 
         if (mouseX >= slotX && mouseX < slotX + SLOT_SIZE &&
             mouseY >= slotY && mouseY < slotY + SLOT_SIZE)
-        {
             return i;
-        }
     }
 
-    return -1; // No slot found
+    return -1; //no slot found
 }
 
 void Game::render(SDL_Renderer* renderer)
@@ -547,7 +554,6 @@ void Game::render(SDL_Renderer* renderer)
     SDL_RenderClear(renderer);
 
     if (!world) return;
-
     int winW, winH;
     SDL_GetRendererOutputSize(renderer, &winW, &winH);
 
@@ -555,172 +561,159 @@ void Game::render(SDL_Renderer* renderer)
     const float cameraY = camera.getPreciseY();
     const float zoom = camera.getZoom();
 
-    float cullLeftPix, cullTopPix, cullRightPix, cullBottomPix;
-    cullLeftPix = -cameraX / zoom;
-    cullTopPix = -cameraY / zoom;
-    cullRightPix = (winW - cameraX) / zoom;
-    cullBottomPix = (winH - cameraY) / zoom;
+    //culling
+    float cullLeftPix = -cameraX / zoom;
+    float cullTopPix = -cameraY / zoom;
+    float cullRightPix = (winW - cameraX) / zoom;
+    float cullBottomPix = (winH - cameraY) / zoom;
 
     constexpr float TILE_PX_SIZE = static_cast<float>(World::TILE_PX_SIZE);
     constexpr float CHUNK_SIZE_PX = static_cast<float>(Chunk::SIZE * World::TILE_PX_SIZE);
-    int minChunkX = static_cast<int>(std::floor(cullLeftPix / CHUNK_SIZE_PX));
-    int maxChunkX = static_cast<int>(std::ceil(cullRightPix / CHUNK_SIZE_PX)) - 1;
-    int minChunkY_Down = static_cast<int>(std::floor(cullTopPix / CHUNK_SIZE_PX));
-    int maxChunkY_Down = static_cast<int>(std::ceil(cullBottomPix / CHUNK_SIZE_PX)) - 1;
-    const int worldChunksX = World::WORLD_WIDTH_IN_CHUNKS;
-    const int worldChunksY = World::WORLD_HEIGHT_IN_CHUNKS;
 
-    int startChunkX = std::clamp(minChunkX, 0, worldChunksX - 1);
-    int endChunkX = std::clamp(maxChunkX, 0, worldChunksX - 1);
-    int startChunkY_Down = std::clamp(minChunkY_Down, 0, worldChunksY - 1);
-    int endChunkY_Down = std::clamp(maxChunkY_Down, 0, worldChunksY - 1);
+    int startChunkX = std::clamp(static_cast<int>(std::floor(cullLeftPix / CHUNK_SIZE_PX)), 0, World::WORLD_WIDTH_IN_CHUNKS - 1);
+    int endChunkX = std::clamp(static_cast<int>(std::ceil(cullRightPix / CHUNK_SIZE_PX)) - 1, 0, World::WORLD_WIDTH_IN_CHUNKS - 1);
+    int startChunkY_Down = std::clamp(static_cast<int>(std::floor(cullTopPix / CHUNK_SIZE_PX)), 0, World::WORLD_HEIGHT_IN_CHUNKS - 1);
+    int endChunkY_Down = std::clamp(static_cast<int>(std::ceil(cullBottomPix / CHUNK_SIZE_PX)) - 1, 0, World::WORLD_HEIGHT_IN_CHUNKS - 1);
 
+    //render the world layers
     for (int layer = TileLayer::NUM_LAYERS - 1; layer >= 0; --layer)
     {
-        //iterate through visible chunks
         for (int cx = startChunkX; cx <= endChunkX; ++cx)
         {
-            //convert the render y index
             for (int cy_Down = startChunkY_Down; cy_Down <= endChunkY_Down; ++cy_Down)
             {
-                const int chunkY_BottomUp = worldChunksY - 1 - cy_Down;
+                const int chunkY_BottomUp = World::WORLD_HEIGHT_IN_CHUNKS - 1 - cy_Down;
                 Chunk* chunk = world->getChunk(cx, chunkY_BottomUp);
                 if (!chunk) continue;
 
                 const float chunkWorldX = cx * CHUNK_SIZE_PX;
                 const float chunkWorldY = cy_Down * CHUNK_SIZE_PX;
 
-                //clamp x and y bounds
                 int startTileX = std::max(0, static_cast<int>(std::floor((cullLeftPix - chunkWorldX) / TILE_PX_SIZE)));
                 int startTileY_Down = std::max(0, static_cast<int>(std::floor((cullTopPix - chunkWorldY) / TILE_PX_SIZE)));
                 int endTileX = std::min(Chunk::SIZE - 1, static_cast<int>(std::ceil((cullRightPix - chunkWorldX) / TILE_PX_SIZE)) - 1);
                 int endTileY_Down = std::min(Chunk::SIZE - 1, static_cast<int>(std::ceil((cullBottomPix - chunkWorldY) / TILE_PX_SIZE)) - 1);
 
-                //iterate through the visible tiles
                 for (int y_Down = startTileY_Down; y_Down <= endTileY_Down; ++y_Down)
                 {
-                    //convert top-down Y index to bottom-up
                     const int y_Storage = Chunk::SIZE - 1 - y_Down;
-
                     for (int x_Local = startTileX; x_Local <= endTileX; ++x_Local)
                     {
-                        auto& [type] = chunk->tiles[y_Storage][x_Local][layer];
+                        const int type = chunk->tiles[y_Storage][x_Local][layer].type;
+                        if (type == 0) continue;
 
-                        //render world properly based on zoom + remove seams when zoom is floating point value
                         const float currentUnscaledWorldX = chunkWorldX + x_Local * TILE_PX_SIZE;
                         const float currentUnscaledWorldY = chunkWorldY + y_Down * TILE_PX_SIZE;
-                        const float nextUnscaledWorldX = chunkWorldX + (x_Local + 1) * TILE_PX_SIZE;
-                        const float nextUnscaledWorldY = chunkWorldY + (y_Down + 1) * TILE_PX_SIZE;
 
                         const int currentScreenX = static_cast<int>(std::floor(currentUnscaledWorldX * zoom + cameraX));
                         const int currentScreenY = static_cast<int>(std::floor(currentUnscaledWorldY * zoom + cameraY));
-                        const int nextScreenX = static_cast<int>(std::floor(nextUnscaledWorldX * zoom + cameraX));
-                        const int nextScreenY = static_cast<int>(std::floor(nextUnscaledWorldY * zoom + cameraY));
+                        const int nextScreenX = static_cast<int>(std::floor((currentUnscaledWorldX + TILE_PX_SIZE) * zoom + cameraX));
+                        const int nextScreenY = static_cast<int>(std::floor((currentUnscaledWorldY + TILE_PX_SIZE) * zoom + cameraY));
 
                         const int scaledTileWidth = nextScreenX - currentScreenX;
                         const int scaledTileHeight = nextScreenY - currentScreenY;
 
-                        if (type == 0) continue; //air
-                        if (scaledTileWidth <= 0 || scaledTileHeight <= 0) continue;
-
-                        switch (type)
-                        {
-                        case 1: textureId = "grass"; break;
-                        case 2: textureId = "dirt"; break;
-                        case 3: textureId = "stone"; break;
-                        case 4: textureId = "wood_log"; break;
-                        case 5: textureId = "torch"; break;
-                        case 6: textureId = "wood_plank"; break;
-                        case 7: textureId = "wood_plank_bg"; break;
-                        case 8: textureId = "stone_bg"; break;
-                        case 9: textureId = "dirt_bg"; break;
-                        case 10: textureId = "leaves"; break;
-                        default: textureId = "missing_texture"; break;
-                        }
-
-                        if (layer == TileLayer::BACKGROUND)
-                        {
-                            SDL_SetTextureAlphaMod(texManager.getTexture(textureId), 150);
-                            texManager.draw(renderer, textureId, currentScreenX, currentScreenY, scaledTileWidth, scaledTileHeight);
-                            SDL_SetTextureAlphaMod(texManager.getTexture(textureId), 255);
-                        }
-                        else
-                            texManager.draw(renderer, textureId, currentScreenX, currentScreenY, scaledTileWidth, scaledTileHeight);
+                        texManager.draw(renderer, getTextureIDFromType(type), currentScreenX, currentScreenY, scaledTileWidth, scaledTileHeight);
                     }
                 }
             }
         }
-        //errors:
-        //placing leaves in different slot then placing in world turns them into dirt walls
-        //trees look weird to change
+    }
 
-        if (layer == TileLayer::BACKGROUND)
+    if (particleManager) particleManager->render(renderer, cameraX, cameraY, zoom);
+
+    //Almas recommended I implement some animations using maths
+    const ItemSlot& selectedSlot = inventory.slots[inventory.selectedHotbarIndex];
+    const auto& itemDef = ItemRegistry::getInstance().getDefinition(selectedSlot.itemID);
+
+    if (!isInventoryOpen && !isFreecamActive && selectedSlot.quantity > 0)
+    {
+        int mx, my;
+        SDL_GetMouseState(&mx, &my);
+
+        //mouse to world coords
+        float mouseWorldX = (static_cast<float>(mx) - cameraX) / zoom;
+        float mouseWorldY = (static_cast<float>(my) - cameraY) / zoom;
+        int tileX = static_cast<int>(std::floor(mouseWorldX / TILE_PX_SIZE));
+        int tileY = static_cast<int>(std::floor(mouseWorldY / TILE_PX_SIZE));
+
+        //render
+        int ghostScreenX = static_cast<int>(std::floor((tileX * TILE_PX_SIZE) * zoom + cameraX));
+        int ghostScreenY = static_cast<int>(std::floor((tileY * TILE_PX_SIZE) * zoom + cameraY));
+        int nextGhostScreenX = static_cast<int>(std::floor(((tileX + 1) * TILE_PX_SIZE) * zoom + cameraX));
+        int nextGhostScreenY = static_cast<int>(std::floor(((tileY + 1) * TILE_PX_SIZE) * zoom + cameraY));
+
+        int drawW = nextGhostScreenX - ghostScreenX;
+        int drawH = nextGhostScreenY - ghostScreenY;
+
+        if (itemDef.isTile)
         {
-            const int originalScaledTilePxSize = static_cast<int>(std::round(World::TILE_PX_SIZE * zoom));
+            //pulsing block effect
+            float time = static_cast<float>(SDL_GetTicks()) / 1000.0f;
+            float pulse = (std::sin(time * 8.0f) + 1.0f) / 2.0f;
+            auto alpha = static_cast<Uint8>(120 + (pulse * 80));
 
-            for (auto& [id, p] : players)
+            if (SDL_Texture* ghostTex = texManager.getTexture(itemDef.textureID))
             {
-                const float playerWorldX = p.visualX * World::TILE_PX_SIZE;
-                const float playerWorldY = p.visualY * World::TILE_PX_SIZE;
-                const int playerScreenX = static_cast<int>(std::floor(playerWorldX * zoom + cameraX));
-                const int playerScreenY = static_cast<int>(std::floor(playerWorldY * zoom + cameraY));
-
-                SDL_Rect rect
-                {
-                    playerScreenX,
-                    playerScreenY,
-                    originalScaledTilePxSize,
-                    originalScaledTilePxSize * 2
-                };
-
-                //player colour
-                SDL_SetRenderDrawColor(renderer, p.color.r, p.color.g, p.color.b, 255);
-                SDL_RenderFillRect(renderer, &rect);
-
-                //outline
-                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-                SDL_RenderDrawRect(renderer, &rect);
-
-                //name display
-                if (!p.name.empty()) {
-                    int textX = playerScreenX + (originalScaledTilePxSize / 2) - (p.name.length() * 5);
-                    int textY = playerScreenY - 25;
-                    drawText(renderer, p.name, textX, textY, { 255, 255, 255, 255 });
-                }
+                SDL_SetTextureBlendMode(ghostTex, SDL_BLENDMODE_BLEND);
+                SDL_SetTextureAlphaMod(ghostTex, alpha);
+                texManager.draw(renderer, itemDef.textureID, ghostScreenX, ghostScreenY, drawW, drawH);
+                SDL_SetTextureAlphaMod(ghostTex, 255);
             }
+        }
+        else
+        {
+            //tool selection outline
+            //render a white outline around the block if a tool is being held
+            SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+            SDL_Rect outlineRect = { ghostScreenX, ghostScreenY, drawW, drawH };
+
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 200);
+            SDL_RenderDrawRect(renderer, &outlineRect);
+
+            outlineRect.x += 1; outlineRect.y += 1;
+            outlineRect.w -= 2; outlineRect.h -= 2;
+            SDL_RenderDrawRect(renderer, &outlineRect);
         }
     }
 
-    constexpr int margin = 10;
+    //render players on top of world
+    const int originalScaledTilePxSize = static_cast<int>(std::round(World::TILE_PX_SIZE * zoom));
+    for (auto& [id, p] : players)
+    {
+        const int playerScreenX = static_cast<int>(std::floor((p.visualX * World::TILE_PX_SIZE) * zoom + cameraX));
+        const int playerScreenY = static_cast<int>(std::floor((p.visualY * World::TILE_PX_SIZE) * zoom + cameraY));
+
+        SDL_Rect rect { playerScreenX, playerScreenY, originalScaledTilePxSize, originalScaledTilePxSize * 2 };
+        SDL_SetRenderDrawColor(renderer, p.color.r, p.color.g, p.color.b, 255);
+        SDL_RenderFillRect(renderer, &rect);
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderDrawRect(renderer, &rect);
+
+        if (!p.name.empty()) {
+            drawText(renderer, p.name, playerScreenX + (originalScaledTilePxSize / 2) - (static_cast<int>(p.name.length()) * 5), playerScreenY - 25, { 255, 255, 255, 255 });
+        }
+    }
+
     renderInventory(renderer, winW, winH);
 
-    //zoom text set to 2 decimal places
+    constexpr int margin = 10;
     std::ostringstream zoomOss;
     zoomOss.precision(2);
     zoomOss << std::fixed << zoom;
-    std::string zoomText = "Zoom: x" + zoomOss.str();
-    drawText(renderer, zoomText, winW - 125, margin + 8, { 255, 255, 255, 255 });
+    drawText(renderer, "Zoom: x" + zoomOss.str(), winW - 125, margin + 8, { 255, 255, 255, 255 });
 
     if (isFreecamActive)
-    {
-        SDL_Color freecamColor = { 255, 255, 0, 255 }; //yellow text so it stands out more
-        std::string freecamText = "FREECAM ACTIVE (Culling fixed on Player)";
-        drawText(renderer, freecamText, winW / 2 - 375, margin + 8, freecamColor);
-
-        std::ostringstream speedOss;
-        speedOss.precision(1);
-        speedOss << std::fixed << freecamSpeed;
-        std::string speedText = "Speed: x: " + speedOss.str();
-        drawText(renderer, speedText, winW / 2 - 200, margin + 8 + 25, freecamColor);
-    }
-
+        drawText(renderer, "Explore Mode [WASD]", winW / 2 - 375, margin + 8, { 255, 255, 0, 255 });
 
     SDL_RenderPresent(renderer);
 }
 
 void Game::update()
 {
-    float lerpSpeed = 0.9f; //lower = smoother but laggier | higher = snappier but more jitter
+    if (particleManager) particleManager->update(0.016f); //idk the delta time sdl stuff
+
+    float lerpSpeed = 0.8f; //lower = smoother but laggier | higher = snappier but more jitter
     for (auto& [id, p] : players)
     {
         //move current x/y to targetX/Y gradually
@@ -771,4 +764,28 @@ void Game::drawText(SDL_Renderer* renderer, const std::string& text, const int x
     SDL_FreeSurface(surface);
     SDL_RenderCopy(renderer, texture, nullptr, &dstRect);
     SDL_DestroyTexture(texture);
+}
+
+//helper to get ID easily from type
+std::string Game::getTextureIDFromType(const int type) {
+    switch (type) {
+    case 1: return "grass";
+    case 2: return "dirt";
+    case 3: return "stone";
+    case 4: return "wood_log";
+    case 5: return "torch";
+    case 6: return "wood_plank";
+    case 7: return "wood_plank_bg";
+    case 8: return "stone_bg";
+    case 9: return "dirt_bg";
+    case 10: return "leaves";
+    case 11: return "tall_grass";
+    case 12: return "flowers";
+    case 13: return "slate";
+    case 14: return "slate_bg";
+    case 15: return "bedrock";
+    case 16: return "wood_platform";
+    case 17: return "glass";
+    default: return "missing_texture";
+    }
 }

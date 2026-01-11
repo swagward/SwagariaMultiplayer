@@ -15,7 +15,15 @@ public class TerrainConfig
     public static final double BASE_HEIGHT = 40.0;
 
     public static final double TREE_CHANCE = 0.15;
+    public static final double FLORA_CHANCE = 0.4;
+    public static final double FLOWER_CHANCE = 0.2;
 
-    public static final long SEED = System.currentTimeMillis();
-    public static final OpenSimplexNoise NOISE = new OpenSimplexNoise(SEED);
+    public static long SEED = System.currentTimeMillis();
+    public static OpenSimplexNoise NOISE = new OpenSimplexNoise(SEED);
+
+    public static void setSeed(long newSeed) {
+        SEED = newSeed;
+        NOISE = new OpenSimplexNoise(SEED);
+        System.out.println("[World] Seed set to: " + SEED);
+    }
 }
