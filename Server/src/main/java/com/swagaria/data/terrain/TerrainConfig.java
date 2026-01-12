@@ -5,8 +5,8 @@ import com.swagaria.util.OpenSimplexNoise;
 public class TerrainConfig
 {
     public static final int CHUNK_SIZE = 16;
-    public static final int WORLD_CHUNKS_X = 16;
-    public static final int WORLD_CHUNKS_Y = 16;
+    public static final int WORLD_CHUNKS_X = 64;
+    public static final int WORLD_CHUNKS_Y = 64;
     public static final int WORLD_WIDTH = CHUNK_SIZE * WORLD_CHUNKS_X;
     public static final int WORLD_HEIGHT = CHUNK_SIZE * WORLD_CHUNKS_Y;
 

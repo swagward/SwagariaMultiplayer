@@ -522,8 +522,7 @@ void Game::renderInventory(SDL_Renderer* renderer, const int winW, const int win
         //draw quantity next to item
         const std::string heldItemQuantity = std::to_string(heldSlot.quantity);
         drawText(renderer, heldItemQuantity,
-                 mouseX + iconSize / 2 + 5, mouseY - 15, // Offset slightly from the center/right of the icon
-                 textColor);
+                 mouseX + iconSize / 2 + 5, mouseY - 15, textColor);
     }
 }
 

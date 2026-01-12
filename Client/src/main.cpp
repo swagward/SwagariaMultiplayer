@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
     game.setNetwork(&network);
 
     auto currentState = AppState::MAIN_MENU;
-    std::string ipInput = "192.168.56.1";
+    std::string ipInput = "Enter Server IP";
     bool isRunning = true;
     SDL_Event event;
 
