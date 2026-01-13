@@ -490,7 +490,7 @@ void Game::renderInventory(SDL_Renderer* renderer, const int winW, const int win
         SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255); //light grey border around slots
         SDL_RenderDrawRect(renderer, &slotRect);
 
-        //adding textures to filled slots
+        //adding item textures to filled slots
         if (!slot.isEmpty())
         {
             constexpr int iconSize = static_cast<int>(SLOT_SIZE * 0.75f);

@@ -43,7 +43,7 @@ public class TileDefinition
         tileID = _tileID;
         name = _name;
         layerToPlace = _layerToPlace;
-        for (TileComponent component : components) //lowkey this looks like python now
+        for (TileComponent component : components)
         {
             this.components.put(component.getClass(), component);
         }

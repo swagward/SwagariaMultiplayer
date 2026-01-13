@@ -198,6 +198,7 @@ public class Chunk
                     //serialize tile ID to be sent to client
                     int typeId = (t == null) ? TileDefinition.ID_AIR : t.getTileID();
                     sb.append(",").append(typeId);
+
                 }
             }
         }

@@ -114,7 +114,7 @@ public class ClientHandler implements Runnable
         String[] parts = line.split(",", 5);
         if (parts.length == 0) return;
 
-        String cmd = parts[0].trim(); //trim just to be safe
+        String cmd = parts[0].trim();
         switch (cmd)
         {
             case "INPUT" -> handleInput(parts);
